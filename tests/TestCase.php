@@ -23,6 +23,7 @@ abstract class TestCase extends Orchestra
             $table->uuid('uuid')->unique();
             $table->string('disk');
             $table->string('path', 2048);
+            $table->char('location_hash', 64)->unique();
             $table->string('filename');
             $table->string('original_filename')->nullable();
             $table->string('extension', 32);
@@ -34,7 +35,6 @@ abstract class TestCase extends Orchestra
             $table->string('owner_id')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
-            $table->unique(['disk', 'path']);
             $table->index(['owner_type', 'owner_id']);
         });
     }

@@ -26,6 +26,8 @@ use Throwable;
 
 final readonly class StoreFile
 {
+    private const string LOCATION_HASH_ALGORITHM = 'sha256';
+
     /**
      * Create the file storage action.
      */
@@ -164,6 +166,7 @@ final readonly class StoreFile
         CollisionPolicy $policy,
     ): StoredFile {
         $modelClass = $this->config->get('file-magic.model', StoredFile::class);
+        $locationHash = $this->locationHash($disk, $path);
 
         if (\is_string($modelClass) === false || \is_a($modelClass, StoredFile::class, true) === false) {
             throw new FileRecordFailed('The configured model must extend StoredFile.');
@@ -171,12 +174,13 @@ final readonly class StoreFile
 
         /** @var StoredFile|null $file */
         $file = $policy === CollisionPolicy::Overwrite
-            ? $modelClass::query()->where('disk', $disk)->where('path', $path)->first()
+            ? $modelClass::query()->where('location_hash', $locationHash)->first()
             : null;
         $file ??= new $modelClass();
         $file->fill([
             'disk' => $disk,
             'path' => $path,
+            'location_hash' => $locationHash,
             'filename' => $filename,
             'original_filename' => $this->originalFilename($pending->source()),
             'extension' => $extension,
@@ -198,6 +202,14 @@ final readonly class StoreFile
         $file->saveOrFail();
 
         return $file;
+    }
+
+    /**
+     * Create the stable identity for a filesystem disk and path pair.
+     */
+    private function locationHash(string $disk, string $path): string
+    {
+        return \hash(self::LOCATION_HASH_ALGORITHM, $disk . "\0" . $path);
     }
 
     /**
