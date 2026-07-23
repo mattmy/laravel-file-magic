@@ -1,0 +1,60 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "mattmy/file-magic",
+    "description": "A strongly typed file management package for Laravel.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/contracts": "^11.0|^12.0|^13.0",
+        "illuminate/database": "^11.0|^12.0|^13.0",
+        "illuminate/filesystem": "^11.0|^12.0|^13.0",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "symfony/http-foundation": "^7.0|^8.0",
+        "symfony/mime": "^7.0|^8.0"
+    },
+    "require-dev": {
+        "intervention/image": "^3.8",
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.29",
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "pestphp/pest": "^3.0|^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0"
+    },
+    "suggest": {
+        "intervention/image": "Required only when using image resizing and encoding."
+    },
+    "autoload": {
+        "psr-4": {
+            "Mattmy\\FileMagic\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Mattmy\\FileMagic\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Mattmy\\FileMagic\\FileMagicServiceProvider"
+            ],
+            "aliases": {
+                "FileMagic": "Mattmy\\FileMagic\\Facades\\FileMagic"
+            }
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "format": "pint",
+        "test": "pest"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

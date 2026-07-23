@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Mattmy\FileMagic;
+
+use Illuminate\Support\ServiceProvider;
+
+final class FileMagicServiceProvider extends ServiceProvider
+{
+    /**
+     * Register package services and configuration.
+     */
+    public function register(): void
+    {
+        $this->mergeConfigFrom(__DIR__ . '/../config/file-magic.php', 'file-magic');
+        $this->app->singleton(FileMagic::class);
+    }
+
+    /**
+     * Register publishable package resources.
+     */
+    public function boot(): void
+    {
+        $timestamp = \date('Y_m_d_His');
+
+        $this->publishes([
+            __DIR__ . '/../config/file-magic.php' => \config_path('file-magic.php'),
+        ], 'file-magic-config');
+
+        $this->publishes([
+            __DIR__ . '/../database/migrations/create_stored_files_table.php.stub' => \database_path("migrations/{$timestamp}_create_stored_files_table.php"),
+        ], 'file-magic-migrations');
+    }
+}
