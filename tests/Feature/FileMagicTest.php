@@ -21,7 +21,8 @@ it('stores and reads an uploaded file', function (): void {
     expect($file)
         ->toBeInstanceOf(StoredFile::class)
         ->contents()->toBe('package test')
-        ->and($file->mime_type)->toBe('text/plain');
+        ->and($file->mime_type)->toBe('text/plain')
+        ->and($file->location_hash)->toBe(\hash('sha256', "testing\0files/manual.txt"));
 
     Storage::disk('testing')->assertExists($file->path);
 });

@@ -19,6 +19,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * @property string $uuid
  * @property string $disk
  * @property string $path
+ * @property string $location_hash
  * @property string $filename
  * @property string|null $original_filename
  * @property string $extension
@@ -42,6 +43,7 @@ class StoredFile extends Model
         'uuid',
         'disk',
         'path',
+        'location_hash',
         'filename',
         'original_filename',
         'extension',
