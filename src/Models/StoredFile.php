@@ -29,8 +29,31 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * @property FileVisibility $visibility
  * @property string|null $owner_type
  * @property string|null $owner_id
- * @property array<string, mixed>|null $metadata
- * @method static Builder<static> query()
+ * @property array<array-key, mixed>|null $metadata
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Model|null $owner
+ * @method static Builder<static>|StoredFile newModelQuery()
+ * @method static Builder<static>|StoredFile newQuery()
+ * @method static Builder<static>|StoredFile query()
+ * @method static Builder<static>|StoredFile whereChecksum($value)
+ * @method static Builder<static>|StoredFile whereCreatedAt($value)
+ * @method static Builder<static>|StoredFile whereDisk($value)
+ * @method static Builder<static>|StoredFile whereExtension($value)
+ * @method static Builder<static>|StoredFile whereFilename($value)
+ * @method static Builder<static>|StoredFile whereId($value)
+ * @method static Builder<static>|StoredFile whereLocationHash($value)
+ * @method static Builder<static>|StoredFile whereMetadata($value)
+ * @method static Builder<static>|StoredFile whereMimeType($value)
+ * @method static Builder<static>|StoredFile whereOriginalFilename($value)
+ * @method static Builder<static>|StoredFile whereOwnerId($value)
+ * @method static Builder<static>|StoredFile whereOwnerType($value)
+ * @method static Builder<static>|StoredFile wherePath($value)
+ * @method static Builder<static>|StoredFile whereSize($value)
+ * @method static Builder<static>|StoredFile whereUpdatedAt($value)
+ * @method static Builder<static>|StoredFile whereUuid($value)
+ * @method static Builder<static>|StoredFile whereVisibility($value)
+ * @mixin \Eloquent
  */
 class StoredFile extends Model
 {
