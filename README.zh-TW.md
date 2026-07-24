@@ -161,11 +161,13 @@ $file = FileMagic::fromBase64(
 )->store();
 ```
 
+Data URI 前綴是選用的。省略前綴時，FileMagic 會根據解碼後的實際內容偵測 MIME type，不需要呼叫端自行提供。
+
 ### Base64 Data URI
 
 ```php
 $file = FileMagic::fromBase64(
-    'data:text/plain;base64.'.\base64_encode('Hello'),
+    'data:text/plain;base64,'.\base64_encode('Hello'),
     'hello.txt',
 )->store();
 ```

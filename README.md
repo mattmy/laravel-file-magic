@@ -140,6 +140,8 @@ $file = FileMagic::fromBase64(
 )->store();
 ```
 
+The Data URI prefix is optional. When omitted, FileMagic detects the MIME type from the decoded content instead of relying on caller-provided metadata.
+
 Data URI:
 
 ```php
