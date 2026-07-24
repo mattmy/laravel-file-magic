@@ -40,11 +40,28 @@ final class FileQuery
     }
 
     /**
-     * Return all resolved files as an operational collection.
+     * Return all resolved files as a standard Laravel collection.
+     *
+     * @return Collection<int, StoredFile>
      */
-    public function get(): FileCollection
+    public function get(): Collection
     {
-        return new FileCollection($this->resolve(), $this->deleteFiles);
+        return $this->resolve()->toBase()->values();
+    }
+
+    /**
+     * Return public URLs keyed by model key for files that exist on disk.
+     *
+     * @return Collection<int|string, string>
+     */
+    public function urls(): Collection
+    {
+        return $this->resolve()
+            ->filter(static fn (StoredFile $file): bool => $file->existsOnDisk())
+            ->mapWithKeys(static fn (StoredFile $file): array => [
+                $file->getKey() => $file->url(),
+            ])
+            ->toBase();
     }
 
     /**
@@ -102,7 +119,7 @@ final class FileQuery
      */
     public function delete(): int
     {
-        return $this->get()->delete();
+        return $this->deleteFiles->execute($this->resolve());
     }
 
     /**
