@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
@@ -84,10 +85,13 @@ it('deletes multiple files in disk and database batches', function (): void {
     $first = FileMagic::fromContent('first')->named('first')->store();
     $second = FileMagic::fromContent('second')->named('second')->store();
 
-    $files = FileMagic::find([$first->id, $second->uuid])->get();
-    $deleted = $files->delete();
+    $query = FileMagic::find([$first->id, $second->uuid]);
+    $files = $query->get();
+    $deleted = $query->delete();
 
-    expect($files)->toHaveCount(2)
+    expect($files::class)->toBe(Collection::class)
+        ->and($files)
+        ->toHaveCount(2)
         ->and($deleted)->toBe(2)
         ->and(StoredFile::query()->count())->toBe(0);
 });
@@ -109,12 +113,12 @@ it('accepts variadic array collection and model targets in order', function (): 
     $second = FileMagic::fromContent('second')->store();
 
     $files = FileMagic::find(collect([$second->uuid, $first->id, $second]))->get();
-    $ids = \array_map(
+    $ids = $files->map(
         static fn (StoredFile $file): int => $file->id,
-        \iterator_to_array($files),
-    );
+    )->all();
 
-    expect($ids)->toBe([$second->id, $first->id])
+    expect($files::class)->toBe(Collection::class)
+        ->and($ids)->toBe([$second->id, $first->id])
         ->and(FileMagic::find($first)->one())->toBe($first)
         ->and(FileMagic::find([])->get()->isEmpty())->toBeTrue();
 });

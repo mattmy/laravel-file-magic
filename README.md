@@ -287,11 +287,11 @@ $collection = FileMagic::find(collect([
 ]))->get();
 ```
 
-All three forms preserve input order and remove duplicate models. IDs and UUIDs are fetched in one query; model targets are reused without querying. Empty arrays and Collections return an empty `FileCollection` without a query.
+All three forms preserve input order and remove duplicate models. IDs and UUIDs are fetched in one query; model targets are reused without querying. Empty arrays and Collections return an empty `Illuminate\Support\Collection` without a query.
 
 Arrays and Collections must be one-dimensional. Every element must be a positive integer ID, valid UUID, or persisted `StoredFile`; invalid elements throw `InvalidFileTarget` instead of being silently removed.
 
-`one()` returns the first resolved `StoredFile` or `null`. `get()` returns an operational `FileCollection`, not an Eloquent query builder.
+`one()` returns the first resolved `StoredFile` or `null`. `get()` returns an `Illuminate\Support\Collection<int, StoredFile>`, so the complete Laravel Collection API is available without exposing an Eloquent query builder.
 
 ## URLs
 
@@ -354,8 +354,7 @@ $deleted = FileMagic::find($target)->delete();
 Batch deletion:
 
 ```php
-$files = FileMagic::find($targets)->get();
-$deleted = $files->delete();
+$deleted = FileMagic::find($targets)->delete();
 ```
 
 Batch deletion groups physical paths by disk and removes database rows in one query.
@@ -438,7 +437,7 @@ Use `RefreshDatabase` for database assertions and load the published migration.
 - `contents()` loads everything into memory; prefer `readStream()` for large files.
 - Base64 necessarily uses additional memory.
 - Image decoding may consume far more memory than the compressed file size.
-- Use `find()` for batch lookup, eager-load owner relations, and call `FileCollection::delete()` for batch deletion.
+- Use `find()` for batch lookup, eager-load owner relations, and call `FileQuery::delete()` for batch deletion.
 
 ## Security
 
@@ -513,7 +512,8 @@ store(): StoredFile
 
 ```php
 one(): ?StoredFile
-get(): FileCollection
+get(): Collection
+urls(): Collection
 exists(): bool
 url(): string
 temporaryUrl(?DateTimeInterface $expiration = null): string
@@ -523,16 +523,7 @@ download(?string $name = null): StreamedResponse
 delete(): int
 ```
 
-### `FileCollection`
-
-```php
-count(): int
-isEmpty(): bool
-first(): ?StoredFile
-urls(): Collection
-delete(): int
-getIterator(): Traversable
-```
+`get()` returns `Illuminate\Support\Collection<int, StoredFile>`. Use Laravel Collection methods such as `map()`, `filter()`, `groupBy()`, `pluck()`, and `values()` for in-memory transformations. Keep filesystem-aware batch operations on `FileQuery` by calling `urls()` or `delete()` before discarding the query object.
 
 ## Troubleshooting
 

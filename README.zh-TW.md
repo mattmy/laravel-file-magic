@@ -361,11 +361,11 @@ $collection = FileMagic::find(collect([
 ]))->get();
 ```
 
-三種形式都會保留輸入順序並移除重複 Model。ID 與 UUID 會合併成一筆查詢；Model target 會直接使用，不會重新查詢。空 array 或 Collection 會回傳空的 `FileCollection`，且不執行查詢。
+三種形式都會保留輸入順序並移除重複 Model。ID 與 UUID 會合併成一筆查詢；Model target 會直接使用，不會重新查詢。空 array 或 Collection 會回傳空的 `Illuminate\Support\Collection`，且不執行查詢。
 
 Array 與 Collection 必須是一維結構，每個元素都必須是正整數 ID、合法 UUID 或已儲存的 `StoredFile`。無效元素會拋出 `InvalidFileTarget`，不會被靜默移除。
 
-`one()` 會回傳第一個符合的 `StoredFile` 或 `null`；`get()` 會回傳可執行批次行為的 `FileCollection`，而不是 Eloquent query builder。
+`one()` 會回傳第一個符合的 `StoredFile` 或 `null`；`get()` 會回傳 `Illuminate\Support\Collection<int, StoredFile>`，可使用完整的 Laravel Collection API，同時不會暴露 Eloquent query builder。
 
 ## 取得 URL
 
@@ -455,8 +455,7 @@ $deleted = FileMagic::find($target)->delete();
 批次刪除：
 
 ```php
-$files = FileMagic::find($targets)->get();
-$deleted = $files->delete();
+$deleted = FileMagic::find($targets)->delete();
 ```
 
 批次刪除會按照 disk 分組處理實體路徑，再使用一筆 database query 刪除紀錄。大量刪除時不要在迴圈中逐一呼叫 model 的 `delete()`。
@@ -561,7 +560,7 @@ expect($file->contents())->toBe('hello');
 - 圖片解碼後的記憶體用量可能遠高於壓縮檔案大小。
 - 批次查詢應使用 `whereIn()`。
 - 查詢 owner 時應使用 `with('owner')`。
-- 大量查詢應使用 `find()`，大量刪除應使用 `FileCollection::delete()`。
+- 大量查詢應使用 `find()`，大量刪除應使用 `FileQuery::delete()`。
 
 ## 安全性注意事項
 
@@ -653,7 +652,8 @@ store(): StoredFile
 
 ```php
 one(): ?StoredFile
-get(): FileCollection
+get(): Collection
+urls(): Collection
 exists(): bool
 url(): string
 temporaryUrl(?DateTimeInterface $expiration = null): string
@@ -663,16 +663,7 @@ download(?string $name = null): StreamedResponse
 delete(): int
 ```
 
-### `FileCollection`
-
-```php
-count(): int
-isEmpty(): bool
-first(): ?StoredFile
-urls(): Collection
-delete(): int
-getIterator(): Traversable
-```
+`get()` 回傳 `Illuminate\Support\Collection<int, StoredFile>`，可直接使用 `map()`、`filter()`、`groupBy()`、`pluck()`、`values()` 等 Laravel Collection 方法。涉及檔案系統的批次行為仍應保留在 `FileQuery`，請在捨棄 query 物件前呼叫 `urls()` 或 `delete()`。
 
 ## 常見問題
 
