@@ -317,9 +317,9 @@ $file = FileMagic::fromUpload($image)
     ->store();
 ```
 
-目前支援 JPEG、PNG、WebP 與 BMP。
+目前會在使用中的 driver 支援時處理 JPEG、PNG、WebP 與 BMP。
 
-GIF 與 SVG 不會被圖片處理器轉換，以免 GIF 動畫被無聲移除，或把可能包含主動內容的 SVG 當成普通點陣圖片。若不呼叫 `resizeImage()`，仍然可以將它們當成一般檔案儲存。
+`resizeImage()` 採用 best-effort 行為：非圖片、GIF、SVG、不支援的格式，以及 Intervention Image 無法解碼或編碼的內容，都會忽略圖片設定並原樣儲存，不會拋出圖片處理例外。無效的圖片選項，以及處理受支援圖片時缺少 Intervention Image、GD 或 Imagick，仍會拋出明確例外。
 
 ## 查詢檔案
 
@@ -510,7 +510,7 @@ final class StoredFile extends BaseStoredFile
 | `FileWriteFailed` | storage 寫入、檔名碰撞或刪除失敗 |
 | `FileRecordFailed` | database 紀錄儲存失敗 |
 | `FileNotFound` | 實體檔案內容或 stream 不存在 |
-| `ImageProcessingUnavailable` | 缺少圖片 dependency、driver 或格式不支援 |
+| `ImageProcessingUnavailable` | 處理受支援圖片時缺少圖片 dependency 或 driver |
 
 在應用程式層處理例外：
 
@@ -690,7 +690,7 @@ Symfony Mime 找不到偵測到的 MIME type 所對應的副檔名。請檢查�
 
 ### 圖片處理拋出 `ImageProcessingUnavailable`
 
-安裝 `intervention/image`、啟用 GD 或 Imagick，並確認輸入格式為 JPEG、PNG、WebP 或 BMP。
+安裝 `intervention/image` 並啟用 GD 或 Imagick。非圖片與不支援格式會自動略過圖片處理，不會拋出此例外。
 
 ### 實體檔案被外部系統移除
 

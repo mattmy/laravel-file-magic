@@ -6,6 +6,9 @@ namespace Mattmy\FileMagic\Support;
 
 use Intervention\Image\Drivers\Gd\Driver as GdDriver;
 use Intervention\Image\Drivers\Imagick\Driver as ImagickDriver;
+use Intervention\Image\Exceptions\DecoderException;
+use Intervention\Image\Exceptions\EncoderException;
+use Intervention\Image\Exceptions\NotSupportedException;
 use Intervention\Image\ImageManager;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Data\ImageOptions;
@@ -19,12 +22,12 @@ final class ImageProcessor
      */
     public function process(FileSource $source, string $mimeType, ImageOptions $options): FileSource
     {
-        if (\class_exists(ImageManager::class) === false) {
-            throw new ImageProcessingUnavailable('Install intervention/image to process images.');
+        if (\in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'], true) === false) {
+            return $source;
         }
 
-        if (\in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'], true) === false) {
-            throw new ImageProcessingUnavailable("Image processing is unavailable for {$mimeType}.");
+        if (\class_exists(ImageManager::class) === false) {
+            throw new ImageProcessingUnavailable('Install intervention/image to process images.');
         }
 
         $manager = ImageManager::usingDriver($this->driver());
@@ -39,6 +42,8 @@ final class ImageProcessor
                 $source->originalFilename(),
                 $mimeType,
             );
+        } catch (DecoderException|EncoderException|NotSupportedException) {
+            return $source;
         } finally {
             \fclose($stream);
         }

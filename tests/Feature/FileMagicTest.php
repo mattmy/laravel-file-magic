@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
 use Mattmy\FileMagic\Exceptions\InvalidStoragePath;
 use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Models\StoredFile;
+use Mattmy\FileMagic\Sources\ContentFileSource;
+use Mattmy\FileMagic\Support\ImageProcessor;
 
 beforeEach(function (): void {
     Storage::fake('testing');
@@ -46,6 +49,29 @@ it('resizes an image with Intervention Image 4', function (): void {
         ->and($size)->toBeArray()
         ->and($size[0])->toBe(1)
         ->and($size[1])->toBe(1);
+});
+
+it('stores non-images unchanged when image resizing is requested', function (): void {
+    $contents = 'FileMagic document';
+    $file = FileMagic::fromContent($contents, 'document.txt', 'text/plain')
+        ->resizeImage(maxWidth: 800, quality: 75)
+        ->store();
+
+    expect($file->contents())->toBe($contents)
+        ->and($file->mime_type)->toBe('text/plain')
+        ->and($file->extension)->toBe('txt')
+        ->and($file->checksum)->toBe(\hash('sha256', $contents));
+});
+
+it('keeps sources that Intervention Image cannot decode', function (): void {
+    $source = new ContentFileSource('invalid png', 'broken.png', 'image/png');
+    $result = (new ImageProcessor())->process(
+        $source,
+        'image/png',
+        new ImageOptions(maxWidth: 800, quality: 75),
+    );
+
+    expect($result)->toBe($source);
 });
 
 it('rejects path traversal', function (): void {
