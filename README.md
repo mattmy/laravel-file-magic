@@ -245,7 +245,7 @@ $file = FileMagic::fromUpload($image)
     ->store();
 ```
 
-JPEG, PNG, WebP, and BMP are supported. GIF and SVG are deliberately not transformed, preventing silent animation loss or treating active SVG content as an ordinary raster image. They may still be stored without `resizeImage()`.
+JPEG, PNG, WebP, and BMP are processed when supported by the active driver. `resizeImage()` is best-effort: non-images, GIF, SVG, unsupported formats, and content that Intervention Image cannot decode or encode are stored unchanged without an image-processing error. Invalid resize options and missing Intervention Image, GD, or Imagick still produce explicit exceptions when a supported image requires processing.
 
 ## Query files
 
@@ -393,7 +393,7 @@ All exceptions extend `FileMagicException`.
 | `FileWriteFailed` | Storage or collision failure |
 | `FileRecordFailed` | Database persistence failure |
 | `FileNotFound` | Physical content unavailable |
-| `ImageProcessingUnavailable` | Missing dependency, driver, or format support |
+| `ImageProcessingUnavailable` | Missing image dependency or driver while processing a supported image |
 
 Handle errors in the application layer:
 
