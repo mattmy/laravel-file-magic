@@ -27,12 +27,12 @@ final class ImageProcessor
             throw new ImageProcessingUnavailable("Image processing is unavailable for {$mimeType}.");
         }
 
-        $manager = ImageManager::withDriver($this->driver());
+        $manager = ImageManager::usingDriver($this->driver());
         $stream = $source->openStream();
 
         try {
-            $image = $manager->read($stream)->scaleDown(width: $options->maxWidth);
-            $encoded = $image->encodeByMediaType($mimeType, quality: $options->quality);
+            $image = $manager->decodeStream($stream)->scaleDown(width: $options->maxWidth);
+            $encoded = $image->encodeUsingMediaType($mimeType, quality: $options->quality);
 
             return new ContentFileSource(
                 (string) $encoded,

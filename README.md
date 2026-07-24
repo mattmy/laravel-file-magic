@@ -6,12 +6,12 @@ FileMagic is a strongly typed file-management package for Laravel. It accepts up
 
 ## Requirements
 
-- PHP 8.2 or later
-- Laravel 11, 12, or 13
+- PHP 8.3 or later
+- Laravel 12 or 13
 - PHP `fileinfo`
 - A configured Laravel Filesystem disk
 
-Image resizing additionally needs `intervention/image` 3.8 or later and PHP GD or Imagick.
+Image resizing additionally needs `intervention/image` 4.0 or later and PHP GD or Imagick.
 
 ## Installation
 
@@ -234,7 +234,7 @@ Passing an existing `StoredFile` model does not execute another database query.
 ## Image resizing
 
 ```bash
-composer require intervention/image
+composer require "intervention/image:^4.0"
 ```
 
 With GD or Imagick enabled:
