@@ -27,6 +27,27 @@ it('stores and reads an uploaded file', function (): void {
     Storage::disk('testing')->assertExists($file->path);
 });
 
+it('resizes an image with Intervention Image 4', function (): void {
+    $contents = \base64_decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        true,
+    );
+
+    if ($contents === false) {
+        throw new RuntimeException('The image fixture could not be decoded.');
+    }
+
+    $file = FileMagic::fromContent($contents, 'pixel.png', 'image/png')
+        ->resizeImage(maxWidth: 1, quality: 80)
+        ->store();
+    $size = \getimagesizefromstring($file->contents());
+
+    expect($file->mime_type)->toBe('image/png')
+        ->and($size)->toBeArray()
+        ->and($size[0])->toBe(1)
+        ->and($size[1])->toBe(1);
+});
+
 it('rejects path traversal', function (): void {
     FileMagic::fromContent('unsafe')
         ->inDirectory('../private')

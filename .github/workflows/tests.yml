@@ -11,12 +11,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - php: '8.2'
-            laravel: '^11.0'
           - php: '8.3'
             laravel: '^12.0'
+            image-extension: gd
+          - php: '8.3'
+            laravel: '^13.0'
+            image-extension: imagick
+          - php: '8.4'
+            laravel: '^12.0'
+            image-extension: imagick
           - php: '8.4'
             laravel: '^13.0'
+            image-extension: gd
+          - php: '8.5'
+            laravel: '^12.0'
+            image-extension: gd
+          - php: '8.5'
+            laravel: '^13.0'
+            image-extension: imagick
 
     steps:
       - uses: actions/checkout@v4
@@ -25,6 +37,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
+          extensions: ${{ matrix.image-extension }}
           tools: composer:v2
 
       - run: composer require "illuminate/contracts:${{ matrix.laravel }}" "illuminate/database:${{ matrix.laravel }}" "illuminate/filesystem:${{ matrix.laravel }}" "illuminate/support:${{ matrix.laravel }}" --no-interaction --no-update

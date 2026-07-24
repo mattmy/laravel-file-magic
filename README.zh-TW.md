@@ -6,14 +6,14 @@ FileMagic 是一個採用強型別設計的 Laravel 檔案管理套件。它可�
 
 ## 系統需求
 
-- PHP 8.2 或以上
-- Laravel 11、12 或 13
+- PHP 8.3 或以上
+- Laravel 12 或 13
 - PHP `fileinfo` extension
 - 至少一個已設定完成的 Laravel Filesystem disk
 
 圖片縮放功能另外需要：
 
-- `intervention/image` 3.8 或以上
+- `intervention/image` 4.0 或以上
 - PHP GD 或 Imagick extension
 
 ## 安裝
@@ -298,7 +298,7 @@ return FileMagic::find($post->attachment)->download();
 先安裝 optional dependency：
 
 ```bash
-composer require intervention/image
+composer require "intervention/image:^4.0"
 ```
 
 確認 GD 或 Imagick 已啟用後，即可按比例縮放：
