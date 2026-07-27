@@ -2,7 +2,7 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
-FileMagic is a strongly typed file-management package for Laravel. It accepts uploads, readable local paths, binary strings, plain Base64, and Base64 Data URIs; detects trusted metadata from content; stores through Laravel Filesystem; and records each object with Eloquent.
+FileMagic is a strongly typed file-management package for Laravel. It accepts uploads, readable local paths, binary strings, plain Base64, and Base64 Data URIs; generates TXT, JSON, and CSV documents; detects or assigns trusted metadata; stores through Laravel Filesystem; and records each object with Eloquent.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ php artisan vendor:publish --tag=file-magic-migrations
 php artisan migrate
 ```
 
-Laravel auto-discovers `Mattmy\FileMagic\FileMagicServiceProvider` and the `FileMagic` facade. If discovery is disabled, register the provider manually:
+Laravel auto-discovers `Mattmy\FileMagic\FileMagicServiceProvider` and the `FileMagic` facade. If discovery is disabled, register the provider manually in `bootstrap/providers.php`:
 
 ```php
 use Mattmy\FileMagic\FileMagicServiceProvider;
@@ -76,6 +76,8 @@ return [
 | `temporary_url_ttl` | Default temporary URL lifetime in minutes |
 | `model` | Class extending `StoredFile` |
 | `table` | File-record table |
+| `image.quality` | Default image output quality |
+| `image.max_width` | Default maximum image width |
 
 Environment overrides:
 
@@ -84,6 +86,33 @@ FILE_MAGIC_DISK=s3
 FILE_MAGIC_DIRECTORY=uploads
 FILE_MAGIC_VISIBILITY=private
 ```
+
+## Core workflow
+
+FileMagic operations follow three stages:
+
+1. Create a `PendingFile` with `fromUpload()`, `fromPath()`, `fromContent()`, `fromBase64()`, `text()`, `json()`, or `csv()`.
+2. Configure storage with methods such as `onDisk()`, `inDirectory()`, `named()`, and `visibility()`.
+3. Call `store()` to persist the physical file and its database record.
+
+```php
+$file = FileMagic::fromUpload($uploadedFile)
+    ->onDisk('local')
+    ->inDirectory('documents')
+    ->named('contract')
+    ->store();
+```
+
+Only the source method and `store()` are required. Every configuration method in between is optional.
+
+| Goal | Methods |
+| --- | --- |
+| Create a pending file | `fromUpload()`, `fromPath()`, `fromContent()`, `fromBase64()` |
+| Generate a document | `text()`, `json()`, `csv()` |
+| Choose storage | `onDisk()`, `inDirectory()` |
+| Choose a filename | `named()` |
+| Persist the file | `store()` |
+| Find and operate on stored files | `find()` |
 
 ## Store an uploaded file
 
@@ -135,8 +164,8 @@ Plain Base64:
 
 ```php
 $file = FileMagic::fromBase64(
-    \base64_encode($contents),
-    'document.pdf',
+    base64: \base64_encode($contents),
+    originalFilename: 'document.pdf',
 )->store();
 ```
 
@@ -146,8 +175,8 @@ Data URI:
 
 ```php
 $file = FileMagic::fromBase64(
-    'data:text/plain;base64,'.\base64_encode('Hello'),
-    'hello.txt',
+    base64: 'data:text/plain;base64,'.\base64_encode('Hello'),
+    originalFilename: 'hello.txt',
 )->store();
 ```
 
@@ -193,7 +222,7 @@ $file = FileMagic::csv([
 
 Associative rows use the first row's keys as a header. List rows do not generate a header. Every row must use the same keys in the same order, and every value must be scalar or `null`. CSV uses UTF-8 without a BOM, comma delimiters, double-quote enclosures, and CRLF line endings.
 
-All three methods return the normal `PendingFile`, so storage, visibility, collision, owner, metadata, and size options remain available. The final method is always `store()`; there are no `storage()`, `toTxt()`, `toJson()`, or `toCsv()` aliases. Stored documents use the normal `StoredFile` and `FileQuery` APIs.
+All three methods return the normal `PendingFile`, so disk, directory, filename, visibility, collision, owner, metadata, MIME, and size options remain available. A `PendingFile` is always persisted with `store()`; it has no `storage()`, `toTxt()`, `toJson()`, or `toCsv()` aliases. Stored documents use the normal `StoredFile` and `FileQuery` APIs.
 
 Invalid UTF-8, JSON values that cannot be encoded, and inconsistent CSV rows throw `InvalidDocumentData`.
 
@@ -277,6 +306,8 @@ return FileMagic::find($post->attachment)->download();
 
 Passing an existing `StoredFile` model does not execute another database query.
 
+The `owner_id` column is a string, so integer, UUID, and ULID owner keys are supported.
+
 ## Image resizing
 
 ```bash
@@ -288,6 +319,14 @@ With GD or Imagick enabled:
 ```php
 $file = FileMagic::fromUpload($image)
     ->resizeImage(maxWidth: 1600, quality: 82)
+    ->store();
+```
+
+Call `resizeImage()` without arguments to use `image.max_width` and `image.quality` from the configuration:
+
+```php
+$file = FileMagic::fromUpload($image)
+    ->resizeImage()
     ->store();
 ```
 
@@ -347,6 +386,17 @@ $temporaryUrl = FileMagic::find($target)->temporaryUrl();
 $customExpiration = FileMagic::find($target)
     ->temporaryUrl(now()->addMinutes(30));
 ```
+
+Retrieve public URLs for multiple targets:
+
+```php
+$urls = FileMagic::find([
+    $firstUuid,
+    $secondUuid,
+])->urls();
+```
+
+`urls()` returns an `Illuminate\Support\Collection<int|string, string>` keyed by model key. Files that do not exist on disk are omitted.
 
 The disk must support the requested operation. Local temporary URLs require `serve => true`; cloud disks require their normal credentials.
 
@@ -438,7 +488,7 @@ All exceptions extend `FileMagicException`.
 | `DisallowedMimeType` | MIME type rejected |
 | `FileWriteFailed` | Storage or collision failure |
 | `FileRecordFailed` | Database persistence failure |
-| `FileNotFound` | Physical content unavailable |
+| `FileNotFound` | No record matched, or physical content or stream is unavailable |
 | `ImageProcessingUnavailable` | Missing image dependency or driver while processing a supported image |
 
 Handle errors in the application layer:
@@ -484,7 +534,7 @@ Use `RefreshDatabase` for database assertions and load the published migration.
 - `contents()` loads everything into memory; prefer `readStream()` for large files.
 - Base64 necessarily uses additional memory.
 - Image decoding may consume far more memory than the compressed file size.
-- Use `find()` for batch lookup, eager-load owner relations, and call `FileQuery::delete()` for batch deletion.
+- Use `find()` for batch lookup and call `FileQuery::delete()` for batch deletion.
 
 ## Security
 
@@ -508,7 +558,7 @@ fromPath(string $path): PendingFile
 fromContent(string $contents, ?string $originalFilename = null, ?string $mimeType = null): PendingFile
 fromBase64(string $base64, ?string $originalFilename = null): PendingFile
 text(string $text): PendingFile
-json(array|JsonSerializable $data): PendingFile
+json(array|\JsonSerializable $data): PendingFile
 csv(iterable $rows): PendingFile
 find(int|string|StoredFile|array|Collection ...$targets): FileQuery
 ```
@@ -568,6 +618,10 @@ Install `intervention/image`, enable GD or Imagick, and use JPEG, PNG, WebP, or 
 ### A physical object was removed externally
 
 `existsOnDisk()` returns `false`; `contents()` and `readStream()` throw `FileNotFound`.
+
+### A published migration filename contains a timestamp
+
+The service provider adds a timestamp when publishing the migration so Laravel executes it in the expected order. Publish it once per application and commit the generated migration.
 
 ## License
 

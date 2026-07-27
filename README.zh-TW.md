@@ -2,7 +2,7 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
-FileMagic 是一個採用強型別設計的 Laravel 檔案管理套件。它可以接收上傳檔案、可讀取的本機路徑、二進位字串、一般 Base64 與 Base64 Data URI，並從實際內容偵測可信任的檔案資訊，透過 Laravel Filesystem 儲存檔案，再使用 Eloquent 保存檔案紀錄。
+FileMagic 是一個採用強型別設計的 Laravel 檔案管理套件。它可以接收上傳檔案、可讀取的本機路徑、二進位字串、一般 Base64 與 Base64 Data URI，也能產生 TXT、JSON 與 CSV 文件。套件會偵測或指定可信任的檔案資訊，透過 Laravel Filesystem 儲存檔案，再使用 Eloquent 保存檔案紀錄。
 
 ## 系統需求
 
@@ -39,7 +39,7 @@ php artisan migrate
 
 Laravel 會自動發現 `Mattmy\FileMagic\FileMagicServiceProvider` 與 `FileMagic` Facade。
 
-如果專案停用了 package discovery，可以手動註冊 Service Provider：
+如果專案停用了 package discovery，可以在 `bootstrap/providers.php` 手動註冊 Service Provider：
 
 ```php
 use Mattmy\FileMagic\FileMagicServiceProvider;
@@ -104,6 +104,33 @@ FILE_MAGIC_DIRECTORY=uploads
 FILE_MAGIC_VISIBILITY=private
 ```
 
+## 核心操作流程
+
+FileMagic 的操作分成三個階段：
+
+1. 使用 `fromUpload()`、`fromPath()`、`fromContent()`、`fromBase64()`、`text()`、`json()` 或 `csv()` 建立 `PendingFile`。
+2. 使用 `onDisk()`、`inDirectory()`、`named()`、`visibility()` 等方法設定儲存方式。
+3. 呼叫 `store()` 儲存實體檔案及資料庫紀錄。
+
+```php
+$file = FileMagic::fromUpload($uploadedFile)
+    ->onDisk('local')
+    ->inDirectory('documents')
+    ->named('contract')
+    ->store();
+```
+
+只有來源方法與最後的 `store()` 是必要步驟，中間的設定方法皆為選用。
+
+| 目的 | 方法 |
+| --- | --- |
+| 建立待儲存檔案 | `fromUpload()`、`fromPath()`、`fromContent()`、`fromBase64()` |
+| 產生文件 | `text()`、`json()`、`csv()` |
+| 設定儲存位置 | `onDisk()`、`inDirectory()` |
+| 設定檔名 | `named()` |
+| 完成儲存 | `store()` |
+| 查詢與操作已儲存檔案 | `find()` |
+
 ## 儲存上傳檔案
 
 將檔案傳給 FileMagic 前，仍應先在 HTTP 邊界進行 Laravel request validation：
@@ -156,8 +183,8 @@ $file = FileMagic::fromContent(
 
 ```php
 $file = FileMagic::fromBase64(
-    \base64_encode($contents),
-    'document.pdf',
+    base64: \base64_encode($contents),
+    originalFilename: 'document.pdf',
 )->store();
 ```
 
@@ -167,8 +194,8 @@ Data URI 前綴是選用的。省略前綴時，FileMagic 會根據解碼後的�
 
 ```php
 $file = FileMagic::fromBase64(
-    'data:text/plain;base64,'.\base64_encode('Hello'),
-    'hello.txt',
+    base64: 'data:text/plain;base64,'.\base64_encode('Hello'),
+    originalFilename: 'hello.txt',
 )->store();
 ```
 
@@ -216,7 +243,7 @@ $file = FileMagic::csv([
 
 Associative rows 會使用第一列的 key 自動產生 header；list rows 不會產生 header。每列必須使用相同的 key 與順序，每個值必須是 scalar 或 `null`。CSV 固定使用不含 BOM 的 UTF-8、逗號 delimiter、雙引號 enclosure 與 CRLF 行尾。
 
-三個方法都會回傳一般的 `PendingFile`，因此仍可使用 disk、visibility、collision、owner、metadata 與 size 設定。最終方法固定為 `store()`，不提供 `storage()`、`toTxt()`、`toJson()` 或 `toCsv()` 別名。儲存後可直接使用既有的 `StoredFile` 與 `FileQuery` API。
+三個方法都會回傳一般的 `PendingFile`，因此仍可使用 disk、directory、filename、visibility、collision、owner、metadata、MIME 與 size 設定。`PendingFile` 固定使用 `store()` 完成儲存，不提供 `storage()`、`toTxt()`、`toJson()` 或 `toCsv()` 別名。儲存後可直接使用既有的 `StoredFile` 與 `FileQuery` API。
 
 無效 UTF-8、無法編碼的 JSON 值，以及結構不一致的 CSV rows 會拋出 `InvalidDocumentData`。
 
@@ -434,6 +461,17 @@ $url = FileMagic::find($target)
     ->temporaryUrl(now()->addMinutes(30));
 ```
 
+批次取得公開 URL：
+
+```php
+$urls = FileMagic::find([
+    $firstUuid,
+    $secondUuid,
+])->urls();
+```
+
+`urls()` 會回傳以 Model key 為索引的 `Illuminate\Support\Collection<int|string, string>`。實體檔案不存在於 disk 的紀錄不會包含在結果中。
+
 使用的 disk 必須支援對應的 URL 操作。本機 temporary URL 需要在 Laravel local disk 設定 `serve => true`；S3 等 cloud disk 則需要完成正常的憑證及 bucket 設定。
 
 ## 讀取與串流
@@ -555,7 +593,7 @@ final class StoredFile extends BaseStoredFile
 | `DisallowedMimeType` | MIME type 不被允許 |
 | `FileWriteFailed` | storage 寫入、檔名碰撞或刪除失敗 |
 | `FileRecordFailed` | database 紀錄儲存失敗 |
-| `FileNotFound` | 實體檔案內容或 stream 不存在 |
+| `FileNotFound` | 找不到符合的檔案紀錄，或實體檔案內容或 stream 不存在 |
 | `ImageProcessingUnavailable` | 處理受支援圖片時缺少圖片 dependency 或 driver |
 
 在應用程式層處理例外：
@@ -605,8 +643,7 @@ expect($file->contents())->toBe('hello');
 - `contents()` 會將整個檔案載入記憶體，大型檔案應使用 `readStream()`。
 - Base64 一定會使用額外記憶體。
 - 圖片解碼後的記憶體用量可能遠高於壓縮檔案大小。
-- 批次查詢應使用 `whereIn()`。
-- 查詢 owner 時應使用 `with('owner')`。
+- 將多個目標一次傳給 `find()`，套件會合併資料庫查詢。
 - 大量查詢應使用 `find()`，大量刪除應使用 `FileQuery::delete()`。
 
 ## 安全性注意事項
@@ -631,7 +668,7 @@ fromPath(string $path): PendingFile
 fromContent(string $contents, ?string $originalFilename = null, ?string $mimeType = null): PendingFile
 fromBase64(string $base64, ?string $originalFilename = null): PendingFile
 text(string $text): PendingFile
-json(array|JsonSerializable $data): PendingFile
+json(array|\JsonSerializable $data): PendingFile
 csv(iterable $rows): PendingFile
 find(int|string|StoredFile|array|Collection ...$targets): FileQuery
 ```
