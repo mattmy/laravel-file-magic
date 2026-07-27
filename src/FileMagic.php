@@ -13,6 +13,7 @@ use Mattmy\FileMagic\Sources\Base64FileSource;
 use Mattmy\FileMagic\Sources\ContentFileSource;
 use Mattmy\FileMagic\Sources\PathFileSource;
 use Mattmy\FileMagic\Sources\UploadedFileSource;
+use Mattmy\FileMagic\Support\DocumentFactory;
 
 final class FileMagic
 {
@@ -22,6 +23,7 @@ final class FileMagic
     public function __construct(
         private readonly FileFinder $finder,
         private readonly DeleteFiles $deleteFiles,
+        private readonly DocumentFactory $documents,
     ) {}
 
     /**
@@ -57,6 +59,34 @@ final class FileMagic
     public function fromBase64(string $base64, ?string $originalFilename = null): PendingFile
     {
         return new PendingFile(new Base64FileSource($base64, $originalFilename));
+    }
+
+    /**
+     * Begin storing a generated UTF-8 plain-text document.
+     */
+    public function text(string $text): PendingFile
+    {
+        return new PendingFile($this->documents->text($text));
+    }
+
+    /**
+     * Begin storing a generated JSON document.
+     *
+     * @param  array<array-key, mixed>|\JsonSerializable  $data
+     */
+    public function json(array|\JsonSerializable $data): PendingFile
+    {
+        return new PendingFile($this->documents->json($data));
+    }
+
+    /**
+     * Begin storing a generated CSV document.
+     *
+     * @param  iterable<array-key, array<array-key, scalar|null>>  $rows
+     */
+    public function csv(iterable $rows): PendingFile
+    {
+        return new PendingFile($this->documents->csv($rows));
     }
 
     /**

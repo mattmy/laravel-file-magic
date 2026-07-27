@@ -6,6 +6,7 @@ namespace Mattmy\FileMagic\Support;
 
 use finfo;
 use Mattmy\FileMagic\Contracts\FileSource;
+use Mattmy\FileMagic\Contracts\TrustedMimeTypeSource;
 use Mattmy\FileMagic\Data\FileMetadata;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
 
@@ -40,15 +41,25 @@ final class FileInspector
                 \hash_update($hash, $chunk);
             }
 
-            $mimeType = (new finfo(FILEINFO_MIME_TYPE))->buffer($sample);
-
-            if (\is_string($mimeType) === false || $mimeType === '') {
-                $mimeType = 'application/octet-stream';
-            }
+            $mimeType = $source instanceof TrustedMimeTypeSource
+                ? $source->trustedMimeType()
+                : $this->detectMimeType($sample);
 
             return new FileMetadata($mimeType, $size, \hash_final($hash));
         } finally {
             \fclose($stream);
         }
+    }
+
+    /**
+     * Detect a MIME type from a sample of untrusted file content.
+     */
+    private function detectMimeType(string $sample): string
+    {
+        $mimeType = (new finfo(FILEINFO_MIME_TYPE))->buffer($sample);
+
+        return \is_string($mimeType) && $mimeType !== ''
+            ? $mimeType
+            : 'application/octet-stream';
     }
 }

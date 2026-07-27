@@ -176,6 +176,50 @@ Base64 採用嚴格解碼。無效或非標準化的內容會拋出 `InvalidBase
 
 Base64 字串本身及解碼後的內容都會占用記憶體。大型檔案應優先使用 upload 或本機路徑來源。
 
+## 產生 TXT、JSON 與 CSV 文件
+
+產生 UTF-8 TXT 文件：
+
+```php
+$file = FileMagic::text("第一行\n第二行")
+    ->onDisk('local')
+    ->inDirectory('documents')
+    ->named('notes')
+    ->store();
+```
+
+`text()` 會完整保留輸入內容，包括空白與換行。空字串會產生空的 `.txt` 檔案。
+
+從 array 或 `JsonSerializable` 物件產生容易閱讀的 JSON：
+
+```php
+$file = FileMagic::json([
+    'message' => '我是文字',
+    'items' => ['第一筆', '第二筆'],
+])
+    ->named('messages')
+    ->store();
+```
+
+JSON 使用 pretty print、保留 Unicode 與未跳脫的 slash，並在文件結尾加入換行。
+
+產生 CSV 文件：
+
+```php
+$file = FileMagic::csv([
+    ['name' => '第一筆', 'content' => '我是文字'],
+    ['name' => '第二筆', 'content' => '我是文字 2'],
+])
+    ->named('messages')
+    ->store();
+```
+
+Associative rows 會使用第一列的 key 自動產生 header；list rows 不會產生 header。每列必須使用相同的 key 與順序，每個值必須是 scalar 或 `null`。CSV 固定使用不含 BOM 的 UTF-8、逗號 delimiter、雙引號 enclosure 與 CRLF 行尾。
+
+三個方法都會回傳一般的 `PendingFile`，因此仍可使用 disk、visibility、collision、owner、metadata 與 size 設定。最終方法固定為 `store()`，不提供 `storage()`、`toTxt()`、`toJson()` 或 `toCsv()` 別名。儲存後可直接使用既有的 `StoredFile` 與 `FileQuery` API。
+
+無效 UTF-8、無法編碼的 JSON 值，以及結構不一致的 CSV rows 會拋出 `InvalidDocumentData`。
+
 ## 自訂儲存方式
 
 ```php
@@ -503,6 +547,7 @@ final class StoredFile extends BaseStoredFile
 | --- | --- |
 | `InvalidFileSource` | 無效 upload、路徑或 stream |
 | `InvalidBase64` | 無效 Base64 或 Data URI |
+| `InvalidDocumentData` | 無效 UTF-8、JSON 資料或 CSV rows |
 | `InvalidFileName` | 不安全或系統保留的檔名 |
 | `InvalidStoragePath` | 不安全的相對目錄 |
 | `InvalidFileTarget` | 無效 ID、UUID、Model、array 或 Collection target |
@@ -585,6 +630,9 @@ fromUpload(UploadedFile $file): PendingFile
 fromPath(string $path): PendingFile
 fromContent(string $contents, ?string $originalFilename = null, ?string $mimeType = null): PendingFile
 fromBase64(string $base64, ?string $originalFilename = null): PendingFile
+text(string $text): PendingFile
+json(array|JsonSerializable $data): PendingFile
+csv(iterable $rows): PendingFile
 find(int|string|StoredFile|array|Collection ...$targets): FileQuery
 ```
 
