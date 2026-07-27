@@ -3,9 +3,18 @@ name: tests
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  tests:
+  compatibility:
+    name: PHP ${{ matrix.php }} / Laravel ${{ matrix.laravel }} / ${{ matrix.image-extension }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -37,11 +46,83 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-          extensions: ${{ matrix.image-extension }}
+          extensions: fileinfo, ${{ matrix.image-extension }}
           tools: composer:v2
 
-      - run: composer require "illuminate/contracts:${{ matrix.laravel }}" "illuminate/database:${{ matrix.laravel }}" "illuminate/filesystem:${{ matrix.laravel }}" "illuminate/support:${{ matrix.laravel }}" --no-interaction --no-update
-      - run: composer update --prefer-dist --no-interaction
-      - run: vendor/bin/pest
-      - run: vendor/bin/pint --test
-      - run: composer analyse
+      - name: Select Laravel version
+        run: composer require "illuminate/contracts:${{ matrix.laravel }}" "illuminate/database:${{ matrix.laravel }}" "illuminate/filesystem:${{ matrix.laravel }}" "illuminate/support:${{ matrix.laravel }}" --no-interaction --no-update
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Run tests
+        run: composer test
+
+  mysql:
+    name: MySQL 8.4 migration
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: file_magic
+          MYSQL_ROOT_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1 --user=root --password=password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: fileinfo, gd, pdo_mysql
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Run tests against MySQL
+        run: composer test
+        env:
+          FILE_MAGIC_TEST_DATABASE: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: file_magic
+          DB_USERNAME: root
+          DB_PASSWORD: password
+
+  quality:
+    name: Quality and security
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: fileinfo, gd
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
+      - name: Run static analysis
+        run: composer analyse
+
+      - name: Check code style
+        run: composer format:check
+
+      - name: Audit dependencies
+        run: composer audit

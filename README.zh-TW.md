@@ -696,3 +696,10 @@ Service Provider 會為發佈的 migration 加上 timestamp，確保 Laravel 按
 ## 授權
 
 FileMagic 是使用 [MIT License](LICENSE) 發佈的開源軟體。
+
+## 專案維護
+
+- 提交 Pull Request 前請閱讀 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- 安全性問題請依照 [SECURITY.md](SECURITY.md) 私下回報。
+- 發布版本遵守 [Semantic Versioning](https://semver.org/)，變更內容記錄於
+  [CHANGELOG.md](CHANGELOG.md)。

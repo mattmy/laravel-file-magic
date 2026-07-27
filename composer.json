@@ -55,7 +55,15 @@
     },
     "scripts": {
         "analyse": "phpstan analyse --memory-limit=1G",
+        "check": [
+            "composer validate --strict",
+            "@test",
+            "@analyse",
+            "@format:check",
+            "composer audit"
+        ],
         "format": "pint",
+        "format:check": "pint --test",
         "test": "pest"
     },
     "minimum-stability": "stable",
