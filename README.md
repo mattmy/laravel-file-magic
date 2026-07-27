@@ -2,7 +2,7 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
-FileMagic is a strongly typed file-management package for Laravel. It accepts uploads, readable local paths, binary strings, plain Base64, and Base64 Data URIs; generates TXT, JSON, and CSV documents; detects or assigns trusted metadata; stores through Laravel Filesystem; and records each object with Eloquent.
+FileMagic is a file-management package for Laravel. It accepts uploads, readable local paths, binary strings, plain Base64, and Base64 Data URIs; generates TXT, JSON, and CSV documents; detects or assigns trusted metadata; stores through Laravel Filesystem; and records each object with Eloquent.
 
 ## Requirements
 
