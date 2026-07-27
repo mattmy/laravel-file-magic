@@ -2,7 +2,7 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
-FileMagic 是一個採用強型別設計的 Laravel 檔案管理套件。它可以接收上傳檔案、可讀取的本機路徑、二進位字串、一般 Base64 與 Base64 Data URI，也能產生 TXT、JSON 與 CSV 文件。套件會偵測或指定可信任的檔案資訊，透過 Laravel Filesystem 儲存檔案，再使用 Eloquent 保存檔案紀錄。
+FileMagic 是一個 Laravel 檔案管理套件。它可以接收上傳檔案、可讀取的本機路徑、二進位字串、一般 Base64 與 Base64 Data URI，也能產生 TXT、JSON 與 CSV 文件。套件會偵測或指定可信任的檔案資訊，透過 Laravel Filesystem 儲存檔案，再使用 Eloquent 保存檔案紀錄。
 
 ## 系統需求
 
