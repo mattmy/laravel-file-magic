@@ -453,34 +453,6 @@ Use `RefreshDatabase` for database assertions and load the published migration.
 - Configure web-server request limits in addition to `max_size`.
 - Add antivirus scanning when required by the threat model.
 
-## Migration from `App\Support\File`
-
-```php
-// Before
-App\Support\File\FileMagic::parse($uploadedFile)->save();
-
-// After
-Mattmy\FileMagic\Facades\FileMagic::fromUpload($uploadedFile)->store();
-```
-
-```php
-// Before
-App\Support\File\FileMagic::base64($base64)->save();
-
-// After
-Mattmy\FileMagic\Facades\FileMagic::fromBase64($base64)->store();
-```
-
-```php
-// Before
-App\Support\File\FileMagic::find($uuid)->one();
-
-// After
-Mattmy\FileMagic\Facades\FileMagic::find($uuid)->one();
-```
-
-Migrate old rows with a dedicated application migration or command after confirming how legacy `name`, `original_name`, and `path` map to the new complete `path`. Do not point both models at one unconverted table.
-
 ## API reference
 
 ### `FileMagic`
