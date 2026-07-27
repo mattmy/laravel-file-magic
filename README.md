@@ -153,6 +153,50 @@ $file = FileMagic::fromBase64(
 
 Decoding is strict. Invalid or non-canonical input throws `InvalidBase64`. Base64 consumes more memory than its decoded file, so prefer uploads or paths for large objects.
 
+## Generate TXT, JSON, and CSV documents
+
+Create a UTF-8 TXT document:
+
+```php
+$file = FileMagic::text("First line\nSecond line")
+    ->onDisk('local')
+    ->inDirectory('documents')
+    ->named('notes')
+    ->store();
+```
+
+`text()` preserves the input exactly, including whitespace and line endings. An empty string creates an empty `.txt` file.
+
+Create a readable JSON document from an array or `JsonSerializable` object:
+
+```php
+$file = FileMagic::json([
+    'message' => 'Hello',
+    'items' => ['First', 'Second'],
+])
+    ->named('messages')
+    ->store();
+```
+
+JSON uses pretty printing, preserves Unicode and unescaped slashes, and ends with a newline.
+
+Create a CSV document:
+
+```php
+$file = FileMagic::csv([
+    ['name' => 'First', 'content' => 'Hello'],
+    ['name' => 'Second', 'content' => 'Hello again'],
+])
+    ->named('messages')
+    ->store();
+```
+
+Associative rows use the first row's keys as a header. List rows do not generate a header. Every row must use the same keys in the same order, and every value must be scalar or `null`. CSV uses UTF-8 without a BOM, comma delimiters, double-quote enclosures, and CRLF line endings.
+
+All three methods return the normal `PendingFile`, so storage, visibility, collision, owner, metadata, and size options remain available. The final method is always `store()`; there are no `storage()`, `toTxt()`, `toJson()`, or `toCsv()` aliases. Stored documents use the normal `StoredFile` and `FileQuery` APIs.
+
+Invalid UTF-8, JSON values that cannot be encoded, and inconsistent CSV rows throw `InvalidDocumentData`.
+
 ## Customize storage
 
 ```php
@@ -386,6 +430,7 @@ All exceptions extend `FileMagicException`.
 | --- | --- |
 | `InvalidFileSource` | Invalid upload, path, or stream |
 | `InvalidBase64` | Invalid Base64 or Data URI |
+| `InvalidDocumentData` | Invalid UTF-8, JSON data, or CSV rows |
 | `InvalidFileName` | Unsafe or reserved name |
 | `InvalidStoragePath` | Unsafe directory |
 | `InvalidFileTarget` | Invalid ID, UUID, model, array, or Collection target |
@@ -462,6 +507,9 @@ fromUpload(UploadedFile $file): PendingFile
 fromPath(string $path): PendingFile
 fromContent(string $contents, ?string $originalFilename = null, ?string $mimeType = null): PendingFile
 fromBase64(string $base64, ?string $originalFilename = null): PendingFile
+text(string $text): PendingFile
+json(array|JsonSerializable $data): PendingFile
+csv(iterable $rows): PendingFile
 find(int|string|StoredFile|array|Collection ...$targets): FileQuery
 ```
 

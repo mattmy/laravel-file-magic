@@ -15,6 +15,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
   and direct file operations.
 - Optional Intervention Image 4 processing with safe fallback for unsupported
   file formats.
+- TXT, JSON, and CSV document generation through the standard `PendingFile`
+  storage flow.
 - PHP, Laravel, image driver, SQLite, and MySQL continuous-integration coverage.
 - Dependency auditing, Dependabot, contribution guidance, and a security policy.
 
