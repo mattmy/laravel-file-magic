@@ -6,6 +6,7 @@ namespace Mattmy\FileMagic;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection as SupportCollection;
+use Mattmy\FileMagic\Actions\CreateZipDownload;
 use Mattmy\FileMagic\Actions\DeleteFiles;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Queries\FileFinder;
@@ -23,6 +24,7 @@ final class FileMagic
     public function __construct(
         private readonly FileFinder $finder,
         private readonly DeleteFiles $deleteFiles,
+        private readonly CreateZipDownload $createZipDownload,
         private readonly DocumentFactory $documents,
     ) {}
 
@@ -96,6 +98,11 @@ final class FileMagic
      */
     public function find(int|string|StoredFile|array|SupportCollection ...$targets): FileQuery
     {
-        return new FileQuery($this->finder, $this->deleteFiles, \array_values($targets));
+        return new FileQuery(
+            $this->finder,
+            $this->deleteFiles,
+            $this->createZipDownload,
+            \array_values($targets),
+        );
     }
 }

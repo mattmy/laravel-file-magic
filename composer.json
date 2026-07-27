@@ -22,6 +22,7 @@
         "pestphp/pest-plugin-laravel": "^3.0|^4.0"
     },
     "suggest": {
+        "ext-zip": "Required only when creating ZIP downloads.",
         "intervention/image": "Required only when using image resizing and encoding."
     },
     "conflict": {

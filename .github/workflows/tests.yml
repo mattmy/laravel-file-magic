@@ -46,7 +46,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-          extensions: fileinfo, ${{ matrix.image-extension }}
+          extensions: fileinfo, zip, ${{ matrix.image-extension }}
           tools: composer:v2
 
       - name: Select Laravel version
@@ -82,7 +82,7 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
-          extensions: fileinfo, gd, pdo_mysql
+          extensions: fileinfo, zip, gd, pdo_mysql
           tools: composer:v2
 
       - name: Install dependencies
@@ -109,7 +109,7 @@ jobs:
         with:
           php-version: '8.3'
           coverage: none
-          extensions: fileinfo, gd
+          extensions: fileinfo, zip, gd
           tools: composer:v2
 
       - name: Install dependencies
@@ -126,3 +126,23 @@ jobs:
 
       - name: Audit dependencies
         run: composer audit
+
+  without-zip:
+    name: ZIP optional dependency
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: fileinfo, :zip
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Verify missing ZIP extension behavior
+        run: vendor/bin/pest --filter="reports ZIP creation unavailable"

@@ -17,6 +17,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
   file formats.
 - TXT, JSON, and CSV document generation through the standard `PendingFile`
   storage flow.
+- Optional streamed ZIP downloads through `FileQuery::downloadZip()`, including
+  safe entry naming, configurable limits, and temporary-file cleanup.
 - PHP, Laravel, image driver, SQLite, and MySQL continuous-integration coverage.
 - Dependency auditing, Dependabot, contribution guidance, and a security policy.
 

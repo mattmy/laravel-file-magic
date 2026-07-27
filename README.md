@@ -12,6 +12,7 @@ FileMagic is a strongly typed file-management package for Laravel. It accepts up
 - A configured Laravel Filesystem disk
 
 Image resizing additionally needs `intervention/image` 4.0 or later and PHP GD or Imagick.
+ZIP downloads additionally need PHP `ext-zip`.
 
 ## Installation
 
@@ -60,6 +61,10 @@ return [
         'quality' => 80,
         'max_width' => 1920,
     ],
+    'zip' => [
+        'max_files' => 100,
+        'max_size' => 1024 * 1024 * 1024,
+    ],
 ];
 ```
 
@@ -78,6 +83,8 @@ return [
 | `table` | File-record table |
 | `image.quality` | Default image output quality |
 | `image.max_width` | Default maximum image width |
+| `zip.max_files` | Maximum files in one ZIP download |
+| `zip.max_size` | Maximum uncompressed source bytes in one ZIP download |
 
 Environment overrides:
 
@@ -113,6 +120,7 @@ Only the source method and `store()` are required. Every configuration method in
 | Choose a filename | `named()` |
 | Persist the file | `store()` |
 | Find and operate on stored files | `find()` |
+| Download multiple files as ZIP | `find()->downloadZip()` |
 
 ## Store an uploaded file
 
@@ -439,6 +447,39 @@ return FileMagic::find($target)->download('invoice-2026.pdf');
 
 Laravel streams the response using the detected MIME type.
 
+## Download multiple files as ZIP
+
+PHP `ext-zip` must be installed and enabled.
+
+Use the safe generated download name:
+
+```php
+return FileMagic::find([
+    $firstId,
+    $secondUuid,
+    $fileModel,
+])->downloadZip();
+```
+
+Choose the ZIP download name:
+
+```php
+return FileMagic::find($targets)->downloadZip('project-documents');
+```
+
+Both `project-documents` and `project-documents.zip` produce `project-documents.zip`.
+Archive entries use each file's original name. Duplicate names become `report (2).pdf`,
+`report (3).pdf`, and so on, while preserving query order.
+
+ZIP creation is streamed through bounded local temporary files instead of loading every
+source into memory. The temporary archive is deleted after the response is sent.
+`zip.max_files` and `zip.max_size` limit each operation; `zip.max_size` measures the
+uncompressed source bytes.
+
+An empty result or any missing physical file fails the complete operation. FileMagic does
+not silently return a partial archive. `downloadZip()` creates only a temporary HTTP
+download and does not create another `StoredFile` record.
+
 ## Delete
 
 Single file:
@@ -490,6 +531,9 @@ All exceptions extend `FileMagicException`.
 | `FileRecordFailed` | Database persistence failure |
 | `FileNotFound` | No record matched, or physical content or stream is unavailable |
 | `ImageProcessingUnavailable` | Missing image dependency or driver while processing a supported image |
+| `ZipCreationUnavailable` | PHP `ext-zip` is unavailable |
+| `ZipCreationFailed` | Temporary ZIP creation or finalization failed |
+| `ZipLimitExceeded` | ZIP file-count or uncompressed-size limit exceeded |
 
 Handle errors in the application layer:
 
@@ -534,6 +578,7 @@ Use `RefreshDatabase` for database assertions and load the published migration.
 - `contents()` loads everything into memory; prefer `readStream()` for large files.
 - Base64 necessarily uses additional memory.
 - Image decoding may consume far more memory than the compressed file size.
+- ZIP downloads use local temporary disk space up to the uncompressed source size plus the archive size.
 - Use `find()` for batch lookup and call `FileQuery::delete()` for batch deletion.
 
 ## Security
@@ -545,6 +590,7 @@ Use `RefreshDatabase` for database assertions and load the published migration.
 - Consider blocking HTML and SVG when serving from the same origin.
 - Keep private files on private disks and use short-lived temporary URLs.
 - Never pass a user-controlled server path to `fromPath()`.
+- Authorize every file in a ZIP download before passing its targets to FileMagic.
 - Configure web-server request limits in addition to `max_size`.
 - Add antivirus scanning when required by the threat model.
 
@@ -592,6 +638,7 @@ temporaryUrl(?DateTimeInterface $expiration = null): string
 contents(): string
 readStream(): resource
 download(?string $name = null): StreamedResponse
+downloadZip(?string $name = null): BinaryFileResponse
 delete(): int
 ```
 
@@ -622,6 +669,11 @@ Install `intervention/image`, enable GD or Imagick, and use JPEG, PNG, WebP, or 
 ### A published migration filename contains a timestamp
 
 The service provider adds a timestamp when publishing the migration so Laravel executes it in the expected order. Publish it once per application and commit the generated migration.
+
+### ZIP downloads are unavailable
+
+Install and enable PHP `ext-zip`. Also ensure the PHP process can write to the system
+temporary directory and that it has enough free space for the source files and archive.
 
 ## License
 

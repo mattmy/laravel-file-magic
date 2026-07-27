@@ -21,4 +21,8 @@ return [
         'quality' => 80,
         'max_width' => 1920,
     ],
+    'zip' => [
+        'max_files' => 100,
+        'max_size' => 1024 * 1024 * 1024,
+    ],
 ];
