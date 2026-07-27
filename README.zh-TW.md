@@ -16,6 +16,8 @@ FileMagic 是一個採用強型別設計的 Laravel 檔案管理套件。它可�
 - `intervention/image` 4.0 或以上
 - PHP GD 或 Imagick extension
 
+ZIP 批次下載另外需要 PHP `ext-zip`。
+
 ## 安裝
 
 透過 Composer 安裝套件：
@@ -77,6 +79,10 @@ return [
         'quality' => 80,
         'max_width' => 1920,
     ],
+    'zip' => [
+        'max_files' => 100,
+        'max_size' => 1024 * 1024 * 1024,
+    ],
 ];
 ```
 
@@ -95,6 +101,8 @@ return [
 | `table` | 儲存檔案紀錄的資料表 |
 | `image.quality` | 圖片處理的預設品質 |
 | `image.max_width` | 圖片處理的預設最大寬度 |
+| `zip.max_files` | 單次 ZIP 下載允許的最大檔案數 |
+| `zip.max_size` | 單次 ZIP 下載允許的未壓縮來源總 bytes |
 
 可以透過環境變數覆寫常用設定：
 
@@ -130,6 +138,7 @@ $file = FileMagic::fromUpload($uploadedFile)
 | 設定檔名 | `named()` |
 | 完成儲存 | `store()` |
 | 查詢與操作已儲存檔案 | `find()` |
+| 將多個檔案下載為 ZIP | `find()->downloadZip()` |
 
 ## 儲存上傳檔案
 
@@ -528,6 +537,37 @@ return FileMagic::find($target)->download('invoice-2026.pdf');
 
 Laravel Filesystem 會以 stream 回傳 response，並使用從內容偵測到的 MIME type。
 
+## 將多個檔案下載為 ZIP
+
+必須先安裝並啟用 PHP `ext-zip`。
+
+使用安全的自動產生下載名稱：
+
+```php
+return FileMagic::find([
+    $firstId,
+    $secondUuid,
+    $fileModel,
+])->downloadZip();
+```
+
+自訂 ZIP 下載名稱：
+
+```php
+return FileMagic::find($targets)->downloadZip('project-documents');
+```
+
+傳入 `project-documents` 或 `project-documents.zip` 都會產生
+`project-documents.zip`。ZIP entry 預設使用每個檔案的原始名稱；名稱重複時會依
+query 順序產生 `report (2).pdf`、`report (3).pdf`。
+
+ZIP 會透過有上限的本機暫存檔串流建立，不會把所有來源內容同時載入記憶體。
+Response 傳送完成後會自動刪除暫存 archive。每次操作受到 `zip.max_files` 與
+`zip.max_size` 限制；`zip.max_size` 計算未壓縮的來源總 bytes。
+
+查詢結果為空或任一實體檔案不存在時，整個操作都會失敗，不會靜默回傳不完整的
+ZIP。`downloadZip()` 只建立暫時的 HTTP 下載，不會新增 `StoredFile` 紀錄。
+
 ## 刪除檔案
 
 刪除單筆實體檔案與資料庫紀錄：
@@ -595,6 +635,9 @@ final class StoredFile extends BaseStoredFile
 | `FileRecordFailed` | database 紀錄儲存失敗 |
 | `FileNotFound` | 找不到符合的檔案紀錄，或實體檔案內容或 stream 不存在 |
 | `ImageProcessingUnavailable` | 處理受支援圖片時缺少圖片 dependency 或 driver |
+| `ZipCreationUnavailable` | PHP `ext-zip` 不可用 |
+| `ZipCreationFailed` | 暫存 ZIP 建立或結束寫入失敗 |
+| `ZipLimitExceeded` | ZIP 檔案數量或未壓縮大小超過限制 |
 
 在應用程式層處理例外：
 
@@ -643,6 +686,7 @@ expect($file->contents())->toBe('hello');
 - `contents()` 會將整個檔案載入記憶體，大型檔案應使用 `readStream()`。
 - Base64 一定會使用額外記憶體。
 - 圖片解碼後的記憶體用量可能遠高於壓縮檔案大小。
+- ZIP 下載會使用本機暫存空間，最高可能同時包含未壓縮來源檔案及 archive。
 - 將多個目標一次傳給 `find()`，套件會合併資料庫查詢。
 - 大量查詢應使用 `find()`，大量刪除應使用 `FileQuery::delete()`。
 
@@ -655,6 +699,7 @@ expect($file->contents())->toBe('hello');
 - 從同一網域提供檔案時，應考慮封鎖 HTML 與 SVG。
 - 私密檔案應放在 private disk，並使用短效 temporary URL。
 - 不要把使用者控制的伺服器路徑直接傳給 `fromPath()`。
+- ZIP 下載前必須先對每個 target 進行 authorization。
 - 除了 `max_size`，也應設定 Web Server 與 PHP request limit。
 - 威脅模型有需求時，應額外串接防毒掃描服務。
 
@@ -702,6 +747,7 @@ temporaryUrl(?DateTimeInterface $expiration = null): string
 contents(): string
 readStream(): resource
 download(?string $name = null): StreamedResponse
+downloadZip(?string $name = null): BinaryFileResponse
 delete(): int
 ```
 
@@ -732,6 +778,11 @@ Symfony Mime 找不到偵測到的 MIME type 所對應的副檔名。請檢查�
 ### 發佈 migration 後檔名包含時間
 
 Service Provider 會為發佈的 migration 加上 timestamp，確保 Laravel 按正確順序執行。每個專案只需發佈一次，並將產生的 migration 納入版本控制。
+
+### ZIP 下載功能無法使用
+
+請安裝並啟用 PHP `ext-zip`，同時確認 PHP process 可以寫入系統暫存目錄，且暫存
+空間足以容納來源檔案及 ZIP archive。
 
 ## 授權
 

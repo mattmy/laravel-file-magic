@@ -9,6 +9,8 @@ use Mattmy\FileMagic\Exceptions\InvalidStoragePath;
 
 final class PathNormalizer
 {
+    public const MAX_FILENAME_LENGTH = 200;
+
     /**
      * Normalize a relative storage directory.
      */
@@ -67,7 +69,7 @@ final class PathNormalizer
 
         if (
             $filename === '' ||
-            \mb_strlen($filename) > 200 ||
+            \mb_strlen($filename) > self::MAX_FILENAME_LENGTH ||
             \preg_match('/[<>:"\/\\\\|?*\x00-\x1F]/u', $filename) === 1 ||
             \str_starts_with($filename, '.') ||
             \str_ends_with($filename, '.') ||

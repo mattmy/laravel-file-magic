@@ -7,10 +7,12 @@ namespace Mattmy\FileMagic;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
+use Mattmy\FileMagic\Actions\CreateZipDownload;
 use Mattmy\FileMagic\Actions\DeleteFiles;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Queries\FileFinder;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class FileQuery
@@ -28,6 +30,7 @@ final class FileQuery
     public function __construct(
         private readonly FileFinder $finder,
         private readonly DeleteFiles $deleteFiles,
+        private readonly CreateZipDownload $createZipDownload,
         private readonly array $targets,
     ) {}
 
@@ -112,6 +115,14 @@ final class FileQuery
     public function download(?string $name = null): StreamedResponse
     {
         return $this->requiredFile()->download($name);
+    }
+
+    /**
+     * Create a ZIP download containing every resolved file.
+     */
+    public function downloadZip(?string $name = null): BinaryFileResponse
+    {
+        return $this->createZipDownload->execute($this->resolve(), $name);
     }
 
     /**
