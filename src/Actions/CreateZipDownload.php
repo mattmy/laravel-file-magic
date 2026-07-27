@@ -20,13 +20,13 @@ use ZipArchive;
 
 final readonly class CreateZipDownload
 {
-    private const COPY_CHUNK_BYTES = 8192;
+    private const int COPY_CHUNK_BYTES = 8192;
 
-    private const DEFAULT_MAX_FILES = 100;
+    private const int DEFAULT_MAX_FILES = 100;
 
-    private const DEFAULT_MAX_SIZE = 1073741824;
+    private const int DEFAULT_MAX_SIZE = 1073741824;
 
-    private const TEMPORARY_FILE_PREFIX = 'file-magic-';
+    private const string TEMPORARY_FILE_PREFIX = 'file-magic-';
 
     /**
      * Create the ZIP download action.

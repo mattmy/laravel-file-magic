@@ -8,11 +8,11 @@ use Mattmy\FileMagic\Exceptions\InvalidFileName;
 
 final readonly class ZipNameNormalizer
 {
-    private const DEFAULT_NAME_PREFIX = 'files-';
+    private const string DEFAULT_NAME_PREFIX = 'files-';
 
-    private const RANDOM_NAME_BYTES = 8;
+    private const int RANDOM_NAME_BYTES = 8;
 
-    private const ZIP_EXTENSION = '.zip';
+    private const string ZIP_EXTENSION = '.zip';
 
     /**
      * Create the ZIP name normalizer.

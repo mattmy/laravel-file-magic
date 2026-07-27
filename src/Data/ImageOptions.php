@@ -8,9 +8,9 @@ use InvalidArgumentException;
 
 final readonly class ImageOptions
 {
-    public const MINIMUM_QUALITY = 1;
+    public const int MINIMUM_QUALITY = 1;
 
-    public const MAXIMUM_QUALITY = 100;
+    public const int MAXIMUM_QUALITY = 100;
 
     /**
      * Describe an optional image resize and encoding operation.
