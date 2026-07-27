@@ -552,3 +552,10 @@ Install `intervention/image`, enable GD or Imagick, and use JPEG, PNG, WebP, or 
 ## License
 
 FileMagic is open-source software licensed under the [MIT License](LICENSE).
+
+## Project maintenance
+
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+- Report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
+- Releases follow [Semantic Versioning](https://semver.org/) and are documented
+  in [CHANGELOG.md](CHANGELOG.md).
