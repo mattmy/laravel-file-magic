@@ -9,7 +9,7 @@ use Mattmy\FileMagic\Exceptions\InvalidStoragePath;
 
 final class PathNormalizer
 {
-    public const MAX_FILENAME_LENGTH = 200;
+    public const int MAX_FILENAME_LENGTH = 200;
 
     /**
      * Normalize a relative storage directory.
