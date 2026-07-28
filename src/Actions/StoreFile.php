@@ -6,6 +6,7 @@ namespace Mattmy\FileMagic\Actions;
 
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Mattmy\FileMagic\Contracts\FileSource;
@@ -14,6 +15,7 @@ use Mattmy\FileMagic\Enums\CollisionPolicy;
 use Mattmy\FileMagic\Enums\FileVisibility;
 use Mattmy\FileMagic\Exceptions\DisallowedMimeType;
 use Mattmy\FileMagic\Exceptions\FileRecordFailed;
+use Mattmy\FileMagic\Exceptions\FileRecoveryFailed;
 use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\FileWriteFailed;
 use Mattmy\FileMagic\Models\StoredFile;
@@ -21,6 +23,8 @@ use Mattmy\FileMagic\PendingFile;
 use Mattmy\FileMagic\Support\ExtensionResolver;
 use Mattmy\FileMagic\Support\FileInspector;
 use Mattmy\FileMagic\Support\ImageProcessor;
+use Mattmy\FileMagic\Support\OverwriteBackup;
+use Mattmy\FileMagic\Support\OverwriteBackupFactory;
 use Mattmy\FileMagic\Support\PathNormalizer;
 use Throwable;
 
@@ -38,6 +42,7 @@ final readonly class StoreFile
         private ExtensionResolver $extensions,
         private PathNormalizer $paths,
         private ImageProcessor $images,
+        private OverwriteBackupFactory $overwriteBackups,
     ) {}
 
     /**
@@ -72,35 +77,123 @@ final readonly class StoreFile
         $path = $this->resolveCollision($diskName, $path, $policy);
         $filename = \pathinfo($path, PATHINFO_FILENAME);
         $pathExisted = $disk->exists($path);
+        $backup = $this->createOverwriteBackup($disk, $path, $policy, $pathExisted);
+
+        try {
+            try {
+                $this->writeFile($disk, $diskName, $path, $source, $visibility);
+            } catch (Throwable $exception) {
+                $this->recoverOrDelete($disk, $path, $pathExisted, $backup, $exception);
+
+                throw $exception instanceof FileWriteFailed
+                    ? $exception
+                    : new FileWriteFailed(
+                        "The file could not be written to disk [{$diskName}].",
+                        previous: $exception,
+                    );
+            }
+
+            try {
+                return $this->createRecord(
+                    $pending,
+                    $metadata,
+                    $diskName,
+                    $path,
+                    $filename,
+                    $extension,
+                    $visibility,
+                    $policy,
+                );
+            } catch (Throwable $exception) {
+                $this->recoverOrDelete($disk, $path, $pathExisted, $backup, $exception);
+
+                throw new FileRecordFailed(
+                    'The database record could not be persisted after writing the file.',
+                    previous: $exception,
+                );
+            }
+        } finally {
+            $backup?->close();
+        }
+    }
+
+    /**
+     * Create a restorable backup only when overwriting an existing object.
+     */
+    private function createOverwriteBackup(
+        Filesystem $filesystem,
+        string $path,
+        CollisionPolicy $policy,
+        bool $pathExisted,
+    ): ?OverwriteBackup {
+        if ($policy !== CollisionPolicy::Overwrite || $pathExisted === false) {
+            return null;
+        }
+
+        return $this->overwriteBackups->create($filesystem, $path);
+    }
+
+    /**
+     * Write a source stream to its resolved storage path.
+     */
+    private function writeFile(
+        Filesystem $filesystem,
+        string $disk,
+        string $path,
+        FileSource $source,
+        FileVisibility $visibility,
+    ): void {
         $stream = $source->openStream();
 
         try {
-            $written = $disk->put($path, $stream, ['visibility' => $visibility->value]);
+            $written = $filesystem->put($path, $stream, ['visibility' => $visibility->value]);
         } finally {
             \fclose($stream);
         }
 
         if ($written === false) {
-            throw new FileWriteFailed("The file could not be written to disk [{$diskName}].");
+            throw new FileWriteFailed("The file could not be written to disk [{$disk}].");
+        }
+    }
+
+    /**
+     * Restore an overwritten object or remove a newly written object.
+     */
+    private function recoverOrDelete(
+        Filesystem $filesystem,
+        string $path,
+        bool $pathExisted,
+        ?OverwriteBackup $backup,
+        Throwable $operationFailure,
+    ): void {
+        if ($backup instanceof OverwriteBackup) {
+            $this->restoreOverwrite($filesystem, $path, $backup, $operationFailure);
+
+            return;
         }
 
-        try {
-            return $this->createRecord(
-                $pending,
-                $metadata,
-                $diskName,
-                $path,
-                $filename,
-                $extension,
-                $visibility,
-                $policy,
-            );
-        } catch (Throwable $exception) {
-            if ($pathExisted === false) {
-                $disk->delete($path);
-            }
+        if ($pathExisted === false) {
+            $filesystem->delete($path);
+        }
+    }
 
-            throw new FileRecordFailed('The database record could not be persisted after writing the file.', previous: $exception);
+    /**
+     * Restore an overwrite backup and preserve both failures when recovery fails.
+     */
+    private function restoreOverwrite(
+        Filesystem $filesystem,
+        string $path,
+        OverwriteBackup $backup,
+        Throwable $operationFailure,
+    ): void {
+        try {
+            $backup->restore($filesystem, $path);
+        } catch (Throwable $recoveryFailure) {
+            throw new FileRecoveryFailed(
+                "The original file could not be restored after an overwrite failure at [{$path}].",
+                $operationFailure,
+                $recoveryFailure,
+            );
         }
     }
 

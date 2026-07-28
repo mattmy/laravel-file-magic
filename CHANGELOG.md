@@ -27,3 +27,5 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 - `FileQuery::get()` returns a standard `Illuminate\Support\Collection`.
 - Storage locations use a fixed-length SHA-256 identity to keep MySQL indexes
   within supported limits.
+- `Overwrite` now creates a streamed local temporary backup and restores the
+  original object and visibility when storage or database persistence fails.

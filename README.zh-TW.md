@@ -285,7 +285,15 @@ CollisionPolicy::Overwrite;
 
 - `Unique`：目標路徑已存在時，自動加入隨機字串。
 - `Error`：目標路徑已存在時拋出 `FileWriteFailed`。
-- `Overwrite`：覆寫既有實體檔案並更新同一筆資料庫紀錄。只有確定要取代原檔案時才應使用。
+- `Overwrite`：覆寫既有實體檔案並更新同一筆資料庫紀錄。
+
+`Overwrite` 會先把完整舊 object 以 stream 落地備份到 PHP 伺服器的本機暫存硬碟。
+如果新內容寫入 storage 或更新 database 失敗，FileMagic 會先還原原始內容及
+visibility，再回報原本的失敗。操作結束後會關閉並刪除暫存備份。
+
+這項安全機制會產生成本：伺服器需要接近舊檔案大小的本機暫存空間，而且會增加
+storage 讀取及本機硬碟 I/O，因此 `Overwrite` 的整體效能會低於一般儲存。除非應用
+程式確實需要維持相同 storage path，否則建議使用預設的 `Unique`。
 
 ## 檔案大小與 MIME type 限制
 
@@ -633,6 +641,7 @@ final class StoredFile extends BaseStoredFile
 | `DisallowedMimeType` | MIME type 不被允許 |
 | `FileWriteFailed` | storage 寫入、檔名碰撞或刪除失敗 |
 | `FileRecordFailed` | database 紀錄儲存失敗 |
+| `FileRecoveryFailed` | Overwrite 失敗，且無法還原原始 object |
 | `FileNotFound` | 找不到符合的檔案紀錄，或實體檔案內容或 stream 不存在 |
 | `ImageProcessingUnavailable` | 處理受支援圖片時缺少圖片 dependency 或 driver |
 | `ZipCreationUnavailable` | PHP `ext-zip` 不可用 |
@@ -686,6 +695,7 @@ expect($file->contents())->toBe('hello');
 - `contents()` 會將整個檔案載入記憶體，大型檔案應使用 `readStream()`。
 - Base64 一定會使用額外記憶體。
 - 圖片解碼後的記憶體用量可能遠高於壓縮檔案大小。
+- `Overwrite` 會將完整舊 object 落地到本機暫存硬碟並增加額外 I/O；不需要固定 path 時應優先使用 `Unique`。
 - ZIP 下載會使用本機暫存空間，最高可能同時包含未壓縮來源檔案及 archive。
 - 將多個目標一次傳給 `find()`，套件會合併資料庫查詢。
 - 大量查詢應使用 `find()`，大量刪除應使用 `FileQuery::delete()`。
@@ -699,6 +709,7 @@ expect($file->contents())->toBe('hello');
 - 從同一網域提供檔案時，應考慮封鎖 HTML 與 SVG。
 - 私密檔案應放在 private disk，並使用短效 temporary URL。
 - 不要把使用者控制的伺服器路徑直接傳給 `fromPath()`。
+- 對敏感或大型檔案啟用 `Overwrite` 前，確認 PHP 系統暫存目錄的權限及可用容量。
 - ZIP 下載前必須先對每個 target 進行 authorization。
 - 除了 `max_size`，也應設定 Web Server 與 PHP request limit。
 - 威脅模型有需求時，應額外串接防毒掃描服務。
