@@ -255,7 +255,17 @@ Collision policies:
 
 - `Unique` adds a random suffix when the path exists.
 - `Error` throws `FileWriteFailed`.
-- `Overwrite` intentionally replaces the physical path.
+- `Overwrite` intentionally replaces the physical path and updates its existing database record.
+
+`Overwrite` first streams the complete existing object into a seekable temporary file on
+the PHP server's local disk. If the new storage write or database update fails, FileMagic
+restores the original content and visibility before reporting the failure. The temporary
+backup is closed and deleted after the operation.
+
+This safety has a cost: the server needs local temporary space approximately equal to the
+existing file size, and the operation performs additional storage reads and local disk I/O.
+`Overwrite` is therefore slower than normal storage. Prefer the default `Unique` policy
+unless the application specifically needs to preserve the same storage path.
 
 ## Size and MIME restrictions
 
@@ -529,6 +539,7 @@ All exceptions extend `FileMagicException`.
 | `DisallowedMimeType` | MIME type rejected |
 | `FileWriteFailed` | Storage or collision failure |
 | `FileRecordFailed` | Database persistence failure |
+| `FileRecoveryFailed` | An overwrite failed and the original object could not be restored |
 | `FileNotFound` | No record matched, or physical content or stream is unavailable |
 | `ImageProcessingUnavailable` | Missing image dependency or driver while processing a supported image |
 | `ZipCreationUnavailable` | PHP `ext-zip` is unavailable |
@@ -578,6 +589,7 @@ Use `RefreshDatabase` for database assertions and load the published migration.
 - `contents()` loads everything into memory; prefer `readStream()` for large files.
 - Base64 necessarily uses additional memory.
 - Image decoding may consume far more memory than the compressed file size.
+- `Overwrite` creates a full local temporary backup of the existing object and performs additional I/O; prefer `Unique` when a fixed path is unnecessary.
 - ZIP downloads use local temporary disk space up to the uncompressed source size plus the archive size.
 - Use `find()` for batch lookup and call `FileQuery::delete()` for batch deletion.
 
@@ -590,6 +602,7 @@ Use `RefreshDatabase` for database assertions and load the published migration.
 - Consider blocking HTML and SVG when serving from the same origin.
 - Keep private files on private disks and use short-lived temporary URLs.
 - Never pass a user-controlled server path to `fromPath()`.
+- Ensure the PHP system temporary directory has appropriate permissions and capacity before enabling `Overwrite` for sensitive or large files.
 - Authorize every file in a ZIP download before passing its targets to FileMagic.
 - Configure web-server request limits in addition to `max_size`.
 - Add antivirus scanning when required by the threat model.
