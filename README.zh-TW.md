@@ -761,7 +761,18 @@ $deleted = FileMagic::find($target)->delete();
 $deleted = FileMagic::find($targets)->delete();
 ```
 
-批次刪除會按照 disk 分組處理實體路徑，再使用一筆 database query 刪除紀錄。大量刪除時不要在迴圈中逐一呼叫 model 的 `delete()`。
+批次刪除會按照 disk 分組。正常路徑中，每個 disk 只執行一次 storage bulk delete，
+最後再用一筆 database query 刪除紀錄。只有 adapter 回傳 `false` 或拋出例外時，
+FileMagic 才會逐一確認該 disk 的路徑：只刪除已確認不存在 object 的紀錄；仍存在或
+無法確認狀態的 object 則保留紀錄供後續重試。
+
+如果只有部分檔案完成刪除，FileMagic 會先保存已確認的一致狀態，再拋出
+`PartialFileDeletion`。可透過 `deletedCount()`、`failedCount()` 與 `failedKeys()`
+取得結果。你可以安全地用原本的 `FileMagic::find($targets)->delete()` 重試；
+已經不存在的 object 會視為刪除完成。
+
+Storage 與 database 不共用 ACID transaction，因此無法保證整批操作完全原子化。
+批次刪除不會建立備份。
 
 ## 自訂 Model
 
@@ -784,7 +795,10 @@ final class StoredFile extends BaseStoredFile
 'model' => App\Models\StoredFile::class,
 ```
 
-自訂 Model 必須繼承套件提供的 `StoredFile`。
+自訂 Model 必須繼承套件提供的 `StoredFile`。FileMagic 會在儲存、查詢與刪除流程
+一致使用自訂 Model，包括它的 connection、table 與 primary key。由於套件已經解析
+出明確 keys，批次刪除紀錄會使用不套用 global scope 的 bulk query，因此不會觸發
+逐筆 Eloquent `deleting` 或 `deleted` events。
 
 ## 自訂資料表
 
@@ -812,11 +826,13 @@ final class StoredFile extends BaseStoredFile
 | `InvalidFileName` | 不安全或系統保留的檔名 |
 | `InvalidStoragePath` | 不安全的相對目錄 |
 | `InvalidFileTarget` | 無效 ID、UUID、Model、array 或 Collection target |
+| `InvalidStoredFileModel` | 設定的 Model 未繼承套件 `StoredFile` |
 | `FileTooLarge` | 檔案超過 byte 限制 |
 | `DisallowedMimeType` | MIME type 不被允許 |
 | `FileWriteFailed` | storage 寫入、檔名碰撞或刪除失敗 |
 | `FileRecordFailed` | database 紀錄儲存失敗 |
 | `FileRecoveryFailed` | Overwrite 失敗，且無法還原原始 object |
+| `PartialFileDeletion` | 只有已確認不存在的 objects 與其紀錄完成刪除 |
 | `FileNotFound` | 找不到符合的檔案紀錄，或實體檔案內容或 stream 不存在 |
 | `ImageProcessingUnavailable` | 處理受支援圖片時缺少圖片 dependency 或 driver |
 | `ZipCreationUnavailable` | PHP `ext-zip` 不可用 |

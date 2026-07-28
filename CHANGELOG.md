@@ -24,6 +24,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 - Secure streamed HTTP(S) imports through `fromUrl()`, with immutable remote
   options, TLS verification, SSRF protection, bounded redirects, byte limits,
   HTML opt-in, and temporary-file cleanup.
+- Consistent batch deletion with partial-failure reconciliation and a structured
+  `PartialFileDeletion` exception.
 
 ### Changed
 
@@ -32,3 +34,5 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
   within supported limits.
 - `Overwrite` now creates a streamed local temporary backup and restores the
   original object and visibility when storage or database persistence fails.
+- Storage, lookup, and deletion now share the configured custom stored-file
+  model, including its connection, table, and primary key.

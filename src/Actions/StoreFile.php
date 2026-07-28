@@ -27,6 +27,7 @@ use Mattmy\FileMagic\Support\ImageProcessor;
 use Mattmy\FileMagic\Support\OverwriteBackup;
 use Mattmy\FileMagic\Support\OverwriteBackupFactory;
 use Mattmy\FileMagic\Support\PathNormalizer;
+use Mattmy\FileMagic\Support\StoredFileModelResolver;
 use Throwable;
 
 final readonly class StoreFile
@@ -44,6 +45,7 @@ final readonly class StoreFile
         private PathNormalizer $paths,
         private ImageProcessor $images,
         private OverwriteBackupFactory $overwriteBackups,
+        private StoredFileModelResolver $models,
     ) {}
 
     /**
@@ -267,12 +269,8 @@ final readonly class StoreFile
         FileVisibility $visibility,
         CollisionPolicy $policy,
     ): StoredFile {
-        $modelClass = $this->config->get('file-magic.model', StoredFile::class);
+        $modelClass = $this->models->resolve();
         $locationHash = $this->locationHash($disk, $path);
-
-        if (\is_string($modelClass) === false || \is_a($modelClass, StoredFile::class, true) === false) {
-            throw new FileRecordFailed('The configured model must extend StoredFile.');
-        }
 
         /** @var StoredFile|null $file */
         $file = $policy === CollisionPolicy::Overwrite
