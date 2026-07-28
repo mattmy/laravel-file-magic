@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic;
 
 use Illuminate\Support\ServiceProvider;
+use Mattmy\FileMagic\Contracts\HostResolver;
+use Mattmy\FileMagic\Support\NativeHostResolver;
 
 final class FileMagicServiceProvider extends ServiceProvider
 {
@@ -14,6 +16,7 @@ final class FileMagicServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/file-magic.php', 'file-magic');
+        $this->app->bind(HostResolver::class, NativeHostResolver::class);
         $this->app->singleton(FileMagic::class);
     }
 

@@ -2,12 +2,13 @@
 
 [English](README.md) | [繁體中文](README.zh-TW.md)
 
-FileMagic is a file-management package for Laravel. It accepts uploads, readable local paths, binary strings, plain Base64, and Base64 Data URIs; generates TXT, JSON, and CSV documents; detects or assigns trusted metadata; stores through Laravel Filesystem; and records each object with Eloquent.
+FileMagic is a file-management package for Laravel. It accepts uploads, readable local paths, remote HTTP(S) files, binary strings, plain Base64, and Base64 Data URIs; generates TXT, JSON, and CSV documents; detects or assigns trusted metadata; stores through Laravel Filesystem; and records each object with Eloquent.
 
 ## Requirements
 
 - PHP 8.3 or later
 - Laravel 12 or 13
+- PHP `curl`
 - PHP `fileinfo`
 - A configured Laravel Filesystem disk
 
@@ -65,6 +66,13 @@ return [
         'max_files' => 100,
         'max_size' => 1024 * 1024 * 1024,
     ],
+    'remote' => [
+        'connect_timeout' => 5,
+        'timeout' => 30,
+        'max_redirects' => 3,
+        'allowed_hosts' => [],
+        'allowed_ports' => [80, 443],
+    ],
 ];
 ```
 
@@ -85,6 +93,11 @@ return [
 | `image.max_width` | Default maximum image width |
 | `zip.max_files` | Maximum files in one ZIP download |
 | `zip.max_size` | Maximum uncompressed source bytes in one ZIP download |
+| `remote.connect_timeout` | Default connection timeout in seconds |
+| `remote.timeout` | Default total download timeout in seconds |
+| `remote.max_redirects` | Default redirect limit from `0` to `10` |
+| `remote.allowed_hosts` | Exact public-host allowlist; empty permits public hosts that pass SSRF validation |
+| `remote.allowed_ports` | Non-empty port allowlist; defaults to standard HTTP and HTTPS ports |
 
 Environment overrides:
 
@@ -98,7 +111,7 @@ FILE_MAGIC_VISIBILITY=private
 
 FileMagic operations follow three stages:
 
-1. Create a `PendingFile` with `fromUpload()`, `fromPath()`, `fromContent()`, `fromBase64()`, `text()`, `json()`, or `csv()`.
+1. Create a `PendingFile` with `fromUpload()`, `fromPath()`, `fromUrl()`, `fromContent()`, `fromBase64()`, `text()`, `json()`, or `csv()`.
 2. Configure storage with methods such as `onDisk()`, `inDirectory()`, `named()`, and `visibility()`.
 3. Call `store()` to persist the physical file and its database record.
 
@@ -114,7 +127,7 @@ Only the source method and `store()` are required. Every configuration method in
 
 | Goal | Methods |
 | --- | --- |
-| Create a pending file | `fromUpload()`, `fromPath()`, `fromContent()`, `fromBase64()` |
+| Create a pending file | `fromUpload()`, `fromPath()`, `fromUrl()`, `fromContent()`, `fromBase64()` |
 | Generate a document | `text()`, `json()`, `csv()` |
 | Choose storage | `onDisk()`, `inDirectory()` |
 | Choose a filename | `named()` |
@@ -189,6 +202,174 @@ $file = FileMagic::fromBase64(
 ```
 
 Decoding is strict. Invalid or non-canonical input throws `InvalidBase64`. Base64 consumes more memory than its decoded file, so prefer uploads or paths for large objects.
+
+## Store a file from a URL
+
+`fromUrl()` accepts absolute HTTP or HTTPS file URLs and returns the normal
+`PendingFile`. HTTPS is the default and TLS certificate verification is enabled:
+
+```php
+use Mattmy\FileMagic\Facades\FileMagic;
+
+$file = FileMagic::fromUrl(
+    'https://downloads.example.com/manual.pdf',
+)
+    ->onDisk('s3')
+    ->inDirectory('manuals')
+    ->named('product-manual')
+    ->maxSize(20 * 1024 * 1024)
+    ->withMetadata(['source' => 'vendor'])
+    ->store();
+```
+
+Typical supported URLs include:
+
+```text
+https://cdn.example.com/images/avatar.jpg
+https://downloads.example.com/documents/manual.pdf
+https://media.example.com/videos/introduction.mp4
+https://files.example.com/archive.zip
+```
+
+Only HTTP(S) is supported. `file:`, `ftp:`, `gopher:`, `data:`, URLs containing
+credentials or fragments, disallowed ports, and URLs that resolve to protected
+networks are rejected.
+
+### RemoteFileOptions
+
+Pass an immutable `RemoteFileOptions` when one operation needs different behavior:
+
+```php
+use Mattmy\FileMagic\Data\RemoteFileOptions;
+
+$options = new RemoteFileOptions(
+    verifyTls: true,
+    allowHttp: false,
+    allowHtml: false,
+    connectTimeoutSeconds: 5,
+    timeoutSeconds: 30,
+    maxRedirects: 3,
+    allowedHosts: ['downloads.example.com'],
+    allowedPorts: [80, 443],
+    allowedPrivateHosts: [],
+);
+
+$file = FileMagic::fromUrl(
+    'https://downloads.example.com/report.pdf',
+    $options,
+)->store();
+```
+
+| Option | Type | Default | Behavior |
+| --- | --- | --- | --- |
+| `verifyTls` | `bool` | `true` | Verifies the HTTPS certificate, hostname, and chain |
+| `allowHttp` | `bool` | `false` | Explicitly permits unencrypted HTTP |
+| `allowHtml` | `bool` | `false` | Allows detected HTML or XHTML content |
+| `connectTimeoutSeconds` | `int` | `5` | Connection timeout; must be greater than zero |
+| `timeoutSeconds` | `int` | `30` | Total timeout; must be at least the connection timeout |
+| `maxRedirects` | `int` | `3` | Redirect limit from `0` to `10`; every hop is revalidated |
+| `allowedHosts` | `list<string>` | `[]` | Exact hostname allowlist; empty permits validated public hosts |
+| `allowedPorts` | `list<int>` | `[80, 443]` | Non-empty port allowlist; values must be between `1` and `65535` |
+| `allowedPrivateHosts` | `list<string>` | `[]` | Exact hosts explicitly allowed to resolve to private addresses |
+
+Port `80` being present does not enable HTTP. With the default `allowHttp: false`,
+HTTP is still rejected. Enable standard HTTP without repeating the default ports:
+
+```php
+$file = FileMagic::fromUrl(
+    'http://downloads.example.com/manual.pdf',
+    new RemoteFileOptions(allowHttp: true),
+)->store();
+```
+
+Non-standard ports must be listed explicitly:
+
+```php
+$file = FileMagic::fromUrl(
+    'https://downloads.example.com:8443/manual.pdf',
+    new RemoteFileOptions(allowedPorts: [80, 443, 8443]),
+)->store();
+```
+
+An empty `allowedPorts` array is invalid; it never means every port. Host lists are
+normalized and compared exactly. `allowedHosts: []` permits public hosts only after
+all DNS and IP checks. Private networks remain blocked unless an exact hostname is
+present in `allowedPrivateHosts`.
+
+### TLS verification
+
+TLS verification is enabled by default and FileMagic never silently disables it or
+downgrades HTTPS to HTTP. For a controlled development or internal environment with
+a self-signed certificate, explicitly disable verification:
+
+```php
+$file = FileMagic::fromUrl(
+    'https://development.example.test/manual.pdf',
+    RemoteFileOptions::withoutTlsVerification(),
+)->store();
+```
+
+> **Security warning:** disabling TLS verification permits man-in-the-middle
+> replacement of the downloaded bytes. Do not use it for public or untrusted
+> networks. It does not enable HTTP or disable SSRF protection.
+
+To combine disabled TLS verification with other settings, construct the options
+explicitly:
+
+```php
+$options = new RemoteFileOptions(
+    verifyTls: false,
+    timeoutSeconds: 60,
+    allowedHosts: ['development.example.test'],
+);
+```
+
+### Website and HTML responses
+
+A normal website usually returns `text/html` rather than a downloadable document.
+FileMagic rejects detected `text/html` and `application/xhtml+xml` by default with
+`DisallowedMimeType`. It does not disguise website source as a `.txt` file.
+
+If storing HTML is intentional:
+
+```php
+use Mattmy\FileMagic\Enums\FileVisibility;
+
+$file = FileMagic::fromUrl(
+    'https://www.example.com/page',
+    new RemoteFileOptions(allowHtml: true),
+)
+    ->visibility(FileVisibility::Private)
+    ->store();
+```
+
+Allowed HTML is stored with its detected HTML MIME type and `.html` extension. HTML
+can execute script when served from an application origin, so keep it private and
+download it as an attachment unless the application sanitizes and isolates it.
+
+### URL download security and performance
+
+FileMagic resolves every A and AAAA record, blocks loopback, private, link-local,
+reserved, multicast, unspecified, and cloud-metadata addresses, pins the validated
+IP to the connection, disables automatic redirects, and repeats validation for
+every redirect. `allowedPrivateHosts` is an explicit escape hatch for known internal
+services; there is no option that enables every private network.
+
+Remote response headers and URL filenames are untrusted hints. MIME and extension
+come from the downloaded bytes. `Content-Length` may reject an oversized response
+early, but the actual streamed bytes are always limited by `maxSize()` or the global
+`max_size`.
+
+Each URL is fetched once with a streaming GET. The temporary file is reused for
+inspection, checksum, optional image processing, and storage, then removed on
+success or failure. This avoids loading the whole response into PHP memory, but it
+uses local temporary disk roughly equal to the downloaded size and occupies the
+current PHP worker until the synchronous download finishes. Configure application
+and network egress controls as defense in depth.
+
+Stored bytes are not automatically safe. Prefer private visibility, attachment
+downloads, MIME allowlists, `X-Content-Type-Options: nosniff`, and an antivirus or
+content-scanning service for untrusted or high-risk workflows.
 
 ## Generate TXT, JSON, and CSV documents
 
@@ -532,6 +713,10 @@ All exceptions extend `FileMagicException`.
 | `InvalidFileSource` | Invalid upload, path, or stream |
 | `InvalidBase64` | Invalid Base64 or Data URI |
 | `InvalidDocumentData` | Invalid UTF-8, JSON data, or CSV rows |
+| `InvalidRemoteOptions` | Invalid timeout, redirect, host, or port option |
+| `InvalidRemoteUrl` | Malformed or unsupported remote URL |
+| `RemoteAccessDenied` | Scheme, host, port, DNS, IP, or network policy rejected the URL |
+| `RemoteDownloadFailed` | DNS, TLS, connection, redirect, HTTP, or temporary download failure |
 | `InvalidFileName` | Unsafe or reserved name |
 | `InvalidStoragePath` | Unsafe directory |
 | `InvalidFileTarget` | Invalid ID, UUID, model, array, or Collection target |
@@ -591,6 +776,8 @@ Use `RefreshDatabase` for database assertions and load the published migration.
 - Image decoding may consume far more memory than the compressed file size.
 - `Overwrite` creates a full local temporary backup of the existing object and performs additional I/O; prefer `Unique` when a fixed path is unnecessary.
 - ZIP downloads use local temporary disk space up to the uncompressed source size plus the archive size.
+- URL imports perform one synchronous streaming GET and use local temporary disk up to the downloaded size.
+- Set URL connection and total timeouts for the reliability needs of the calling workflow.
 - Use `find()` for batch lookup and call `FileQuery::delete()` for batch deletion.
 
 ## Security
@@ -606,6 +793,9 @@ Use `RefreshDatabase` for database assertions and load the published migration.
 - Authorize every file in a ZIP download before passing its targets to FileMagic.
 - Configure web-server request limits in addition to `max_size`.
 - Add antivirus scanning when required by the threat model.
+- URL imports verify TLS by default and reject HTTP unless explicitly enabled.
+- URL imports block SSRF targets and revalidate every redirect; keep an outbound firewall as defense in depth.
+- Keep downloaded HTML and other active content private and serve untrusted files as attachments with `nosniff`.
 
 ## API reference
 
@@ -614,6 +804,7 @@ Use `RefreshDatabase` for database assertions and load the published migration.
 ```php
 fromUpload(UploadedFile $file): PendingFile
 fromPath(string $path): PendingFile
+fromUrl(string $url, ?RemoteFileOptions $options = null): PendingFile
 fromContent(string $contents, ?string $originalFilename = null, ?string $mimeType = null): PendingFile
 fromBase64(string $base64, ?string $originalFilename = null): PendingFile
 text(string $text): PendingFile
@@ -687,6 +878,18 @@ The service provider adds a timestamp when publishing the migration so Laravel e
 
 Install and enable PHP `ext-zip`. Also ensure the PHP process can write to the system
 temporary directory and that it has enough free space for the source files and archive.
+
+### A normal website URL is rejected
+
+Web pages are detected as HTML and rejected by default. Use
+`new RemoteFileOptions(allowHtml: true)` only when storing HTML is intentional.
+FileMagic stores allowed HTML as HTML; it never silently converts it to TXT.
+
+### A development HTTPS URL fails certificate verification
+
+Fix the certificate whenever possible. For a controlled environment only, pass
+`RemoteFileOptions::withoutTlsVerification()`. This weakens TLS authenticity but
+does not enable HTTP, private networks, arbitrary ports, or unsafe redirects.
 
 ## License
 
