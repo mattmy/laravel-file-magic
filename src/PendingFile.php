@@ -7,6 +7,8 @@ namespace Mattmy\FileMagic;
 use Illuminate\Database\Eloquent\Model;
 use Mattmy\FileMagic\Actions\StoreFile;
 use Mattmy\FileMagic\Contracts\FileSource;
+use Mattmy\FileMagic\Contracts\ReleasableFileSource;
+use Mattmy\FileMagic\Contracts\SizeLimitedFileSource;
 use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
 use Mattmy\FileMagic\Enums\FileVisibility;
@@ -174,7 +176,19 @@ final class PendingFile
      */
     public function store(): StoredFile
     {
-        return \app(StoreFile::class)->execute($this);
+        if ($this->source instanceof SizeLimitedFileSource) {
+            $this->source->limitSize(
+                $this->maxSize ?? (int) \config('file-magic.max_size', 104857600),
+            );
+        }
+
+        try {
+            return \app(StoreFile::class)->execute($this);
+        } finally {
+            if ($this->source instanceof ReleasableFileSource) {
+                $this->source->release();
+            }
+        }
     }
 
     /**

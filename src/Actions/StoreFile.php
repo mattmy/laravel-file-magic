@@ -20,6 +20,7 @@ use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\FileWriteFailed;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\PendingFile;
+use Mattmy\FileMagic\Sources\RemoteFileSource;
 use Mattmy\FileMagic\Support\ExtensionResolver;
 use Mattmy\FileMagic\Support\FileInspector;
 use Mattmy\FileMagic\Support\ImageProcessor;
@@ -206,6 +207,14 @@ final readonly class StoreFile
 
         if ($metadata->size > $maximumSize) {
             throw new FileTooLarge("The file exceeds the {$maximumSize} byte limit.");
+        }
+
+        if (
+            $pending->source() instanceof RemoteFileSource &&
+            $pending->source()->allowsHtml() === false &&
+            \in_array($metadata->mimeType, ['text/html', 'application/xhtml+xml'], true)
+        ) {
+            throw new DisallowedMimeType("The remote MIME type [{$metadata->mimeType}] is not allowed.");
         }
 
         $allowed = $pending->allowedMimeTypes() ?? $this->stringList('file-magic.allowed_mime_types');

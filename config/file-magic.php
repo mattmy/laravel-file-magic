@@ -25,4 +25,11 @@ return [
         'max_files' => 100,
         'max_size' => 1024 * 1024 * 1024,
     ],
+    'remote' => [
+        'connect_timeout' => 5,
+        'timeout' => 30,
+        'max_redirects' => 3,
+        'allowed_hosts' => [],
+        'allowed_ports' => [80, 443],
+    ],
 ];

@@ -8,13 +8,17 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection as SupportCollection;
 use Mattmy\FileMagic\Actions\CreateZipDownload;
 use Mattmy\FileMagic\Actions\DeleteFiles;
+use Mattmy\FileMagic\Data\RemoteFileOptions;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Queries\FileFinder;
 use Mattmy\FileMagic\Sources\Base64FileSource;
 use Mattmy\FileMagic\Sources\ContentFileSource;
 use Mattmy\FileMagic\Sources\PathFileSource;
+use Mattmy\FileMagic\Sources\RemoteFileSource;
 use Mattmy\FileMagic\Sources\UploadedFileSource;
 use Mattmy\FileMagic\Support\DocumentFactory;
+use Mattmy\FileMagic\Support\RemoteDownloader;
+use Mattmy\FileMagic\Support\RemoteFileOptionsFactory;
 
 final class FileMagic
 {
@@ -26,6 +30,8 @@ final class FileMagic
         private readonly DeleteFiles $deleteFiles,
         private readonly CreateZipDownload $createZipDownload,
         private readonly DocumentFactory $documents,
+        private readonly RemoteDownloader $remoteDownloader,
+        private readonly RemoteFileOptionsFactory $remoteOptions,
     ) {}
 
     /**
@@ -61,6 +67,18 @@ final class FileMagic
     public function fromBase64(string $base64, ?string $originalFilename = null): PendingFile
     {
         return new PendingFile(new Base64FileSource($base64, $originalFilename));
+    }
+
+    /**
+     * Begin securely downloading and storing a remote HTTP file.
+     */
+    public function fromUrl(string $url, ?RemoteFileOptions $options = null): PendingFile
+    {
+        return new PendingFile(new RemoteFileSource(
+            $url,
+            $options ?? $this->remoteOptions->defaults(),
+            $this->remoteDownloader,
+        ));
     }
 
     /**

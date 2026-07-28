@@ -21,6 +21,9 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
   safe entry naming, configurable limits, and temporary-file cleanup.
 - PHP, Laravel, image driver, SQLite, and MySQL continuous-integration coverage.
 - Dependency auditing, Dependabot, contribution guidance, and a security policy.
+- Secure streamed HTTP(S) imports through `fromUrl()`, with immutable remote
+  options, TLS verification, SSRF protection, bounded redirects, byte limits,
+  HTML opt-in, and temporary-file cleanup.
 
 ### Changed
 
