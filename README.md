@@ -685,7 +685,18 @@ Batch deletion:
 $deleted = FileMagic::find($targets)->delete();
 ```
 
-Batch deletion groups physical paths by disk and removes database rows in one query.
+Batch deletion groups physical paths by disk. The normal path performs one bulk storage
+delete per disk and one database delete. If an adapter returns `false` or throws, FileMagic
+checks only that disk's paths individually: records are removed only for objects confirmed
+missing, while records for existing or unverifiable objects remain available for retry.
+
+If only part of the operation completes, FileMagic first persists the confirmed state and
+then throws `PartialFileDeletion`. Use `deletedCount()`, `failedCount()`, and `failedKeys()`
+to report the result. You may safely retry the original `FileMagic::find($targets)->delete()`;
+already missing objects are treated as deleted.
+
+Storage and the database do not share an ACID transaction, so deletion cannot be globally
+atomic. Batch deletion intentionally does not create backups.
 
 ## Custom model and table
 
@@ -702,7 +713,13 @@ final class StoredFile extends BaseStoredFile {}
 'table' => 'assets',
 ```
 
-The custom model must extend the package model. Configure a custom table before publishing the migration. If already deployed, create a new migration rather than editing migration history.
+The custom model must extend the package model. FileMagic uses it consistently for storage,
+lookup, and deletion, including its connection, table, and primary key. Batch record deletion
+uses an unscoped bulk query because FileMagic has already resolved explicit keys. It therefore
+bypasses global scopes and does not dispatch per-model Eloquent `deleting` or `deleted` events.
+
+Configure a custom table before publishing the migration. If already deployed, create a new
+migration rather than editing migration history.
 
 ## Exceptions
 
@@ -720,11 +737,13 @@ All exceptions extend `FileMagicException`.
 | `InvalidFileName` | Unsafe or reserved name |
 | `InvalidStoragePath` | Unsafe directory |
 | `InvalidFileTarget` | Invalid ID, UUID, model, array, or Collection target |
+| `InvalidStoredFileModel` | Configured model does not extend the package `StoredFile` |
 | `FileTooLarge` | Byte limit exceeded |
 | `DisallowedMimeType` | MIME type rejected |
 | `FileWriteFailed` | Storage or collision failure |
 | `FileRecordFailed` | Database persistence failure |
 | `FileRecoveryFailed` | An overwrite failed and the original object could not be restored |
+| `PartialFileDeletion` | Only confirmed missing objects and their records were deleted |
 | `FileNotFound` | No record matched, or physical content or stream is unavailable |
 | `ImageProcessingUnavailable` | Missing image dependency or driver while processing a supported image |
 | `ZipCreationUnavailable` | PHP `ext-zip` is unavailable |

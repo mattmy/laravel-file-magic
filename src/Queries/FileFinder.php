@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace Mattmy\FileMagic\Queries;
 
-use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Mattmy\FileMagic\Exceptions\InvalidFileTarget;
 use Mattmy\FileMagic\Models\StoredFile;
+use Mattmy\FileMagic\Support\StoredFileModelResolver;
 
 final readonly class FileFinder
 {
     /**
      * Create the file finder.
      */
-    public function __construct(private Config $config) {}
+    public function __construct(private StoredFileModelResolver $models) {}
 
     /**
      * Resolve file targets while preserving input order and removing duplicates.
@@ -132,12 +132,13 @@ final readonly class FileFinder
             return new EloquentCollection();
         }
 
-        $modelClass = $this->modelClass();
+        $modelClass = $this->models->resolve();
+        $keyName = (new $modelClass())->getKeyName();
 
         return $modelClass::query()
-            ->where(function (Builder $query) use ($ids, $uuids): void {
+            ->where(function (Builder $query) use ($ids, $keyName, $uuids): void {
                 if ($ids !== []) {
-                    $query->whereIn('id', \array_values(\array_unique($ids)));
+                    $query->whereIn($keyName, \array_values(\array_unique($ids)));
                 }
 
                 if ($uuids !== []) {
@@ -146,21 +147,5 @@ final readonly class FileFinder
                 }
             })
             ->get();
-    }
-
-    /**
-     * Return the configured stored file model class.
-     *
-     * @return class-string<StoredFile>
-     */
-    private function modelClass(): string
-    {
-        $modelClass = $this->config->get('file-magic.model', StoredFile::class);
-
-        if (\is_string($modelClass) === false || \is_a($modelClass, StoredFile::class, true) === false) {
-            throw new InvalidFileTarget('The configured file model must extend StoredFile.');
-        }
-
-        return $modelClass;
     }
 }
