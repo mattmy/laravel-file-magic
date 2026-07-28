@@ -265,7 +265,7 @@ final readonly class RemoteDownloader
 
         $filename = \rawurldecode(\basename($path));
 
-        return $filename === '' || $filename === '.' || $filename === '/'
+        return \in_array($filename, ['', '.', '/'], true)
             ? null
             : $filename;
     }
