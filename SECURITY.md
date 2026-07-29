@@ -9,7 +9,7 @@ actively supported release lines.
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities through
-[GitHub private vulnerability reporting](https://github.com/mattmy/file-magic/security/advisories/new).
+[GitHub private vulnerability reporting](https://github.com/mattmy/laravel-file-magic/security/advisories/new).
 Do not include exploit details, credentials, private files, or sensitive paths
 in a public issue.
 
