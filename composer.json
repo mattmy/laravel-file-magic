@@ -6,7 +6,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.3",
-        "ext-curl": "*",
+        "ext-fileinfo": "*",
         "guzzlehttp/psr7": "^2.7",
         "illuminate/contracts": "^12.0|^13.0",
         "illuminate/database": "^12.0|^13.0",
@@ -26,6 +26,7 @@
         "pestphp/pest-plugin-laravel": "^3.0|^4.0"
     },
     "suggest": {
+        "ext-curl": "Required only when importing files from HTTP(S) URLs.",
         "ext-zip": "Required only when creating ZIP downloads.",
         "intervention/image": "Required only when using image resizing and encoding."
     },
