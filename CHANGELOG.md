@@ -29,6 +29,10 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ### Changed
 
+- PHP `ext-curl` is now optional and required only for HTTP(S) imports through
+  `fromUrl()`; missing cURL support now raises `RemoteDownloadUnavailable`.
+- Composer now requires PHP `ext-fileinfo` because content-based MIME detection
+  is part of every file storage workflow.
 - `FileQuery::get()` returns a standard `Illuminate\Support\Collection`.
 - Storage locations use a fixed-length SHA-256 identity to keep MySQL indexes
   within supported limits.

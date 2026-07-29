@@ -146,3 +146,23 @@ jobs:
 
       - name: Verify missing ZIP extension behavior
         run: vendor/bin/pest --filter="reports ZIP creation unavailable"
+
+  without-curl:
+    name: cURL optional dependency
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: fileinfo, :curl
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Verify missing cURL extension behavior
+        run: vendor/bin/pest --filter="reports remote downloads unavailable"

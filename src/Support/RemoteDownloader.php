@@ -16,6 +16,7 @@ use Mattmy\FileMagic\Exceptions\FileMagicException;
 use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\InvalidRemoteUrl;
 use Mattmy\FileMagic\Exceptions\RemoteDownloadFailed;
+use Mattmy\FileMagic\Exceptions\RemoteDownloadUnavailable;
 use Psr\Http\Message\ResponseInterface;
 use Throwable;
 
@@ -39,6 +40,8 @@ final readonly class RemoteDownloader
         RemoteFileOptions $options,
         int $maximumBytes,
     ): RemoteDownload {
+        $this->ensureCurlIsAvailable();
+
         $path = \tempnam(\sys_get_temp_dir(), self::TEMPORARY_FILE_PREFIX);
 
         if ($path === false) {
@@ -57,6 +60,18 @@ final readonly class RemoteDownloader
             throw new RemoteDownloadFailed(
                 'The remote file could not be downloaded.',
                 previous: $exception,
+            );
+        }
+    }
+
+    /**
+     * Ensure the optional cURL transport is available before using it.
+     */
+    private function ensureCurlIsAvailable(): void
+    {
+        if (\extension_loaded('curl') === false) {
+            throw new RemoteDownloadUnavailable(
+                'Remote URL imports require the PHP cURL extension.',
             );
         }
     }
