@@ -12,6 +12,7 @@ use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\InvalidRemoteOptions;
 use Mattmy\FileMagic\Exceptions\InvalidRemoteUrl;
 use Mattmy\FileMagic\Exceptions\RemoteAccessDenied;
+use Mattmy\FileMagic\Exceptions\RemoteDownloadUnavailable;
 use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Tests\Fixtures\FakeHostResolver;
 
@@ -25,6 +26,23 @@ beforeEach(function (): void {
         'private.example.com' => ['127.0.0.1'],
         'mixed.example.com' => ['93.184.216.34', '127.0.0.1'],
     ]));
+});
+
+it('keeps local sources available and reports remote downloads unavailable without curl', function (): void {
+    if (\extension_loaded('curl') === true) {
+        $this->markTestSkipped('The PHP cURL extension is enabled.');
+    }
+
+    $pendingRemoteFile = FileMagic::fromUrl('https://downloads.example.com/manual.txt');
+    $localFile = FileMagic::fromContent('local document', 'local.txt')
+        ->onDisk('testing')
+        ->store();
+
+    expect($localFile->contents())->toBe('local document')
+        ->and(static fn () => $pendingRemoteFile->store())
+        ->toThrow(RemoteDownloadUnavailable::class);
+
+    Http::assertNothingSent();
 });
 
 it('downloads a remote file once through the complete pending file API', function (): void {

@@ -10,11 +10,18 @@ and deleting files through Laravel Filesystem and Eloquent.
 
 - PHP 8.3 or later
 - Laravel 12 or 13
-- PHP `curl` and `fileinfo`
+- PHP `ext-fileinfo`
 - A configured Laravel Filesystem disk
 
-Image resizing additionally needs `intervention/image` 4.0 or later and GD or
-Imagick. ZIP downloads additionally need PHP `ext-zip`.
+Composer checks `ext-fileinfo` during installation because FileMagic detects
+MIME types from actual file contents instead of trusting filenames or
+client-provided MIME types.
+
+Remote HTTP(S) imports through `fromUrl()` additionally need PHP `ext-curl`.
+Without it, all other features remain available, while storing a remote source
+throws `RemoteDownloadUnavailable`. Image resizing additionally needs
+`intervention/image` 4.0 or later and GD or Imagick. ZIP downloads additionally
+need PHP `ext-zip`.
 
 ## Installation
 

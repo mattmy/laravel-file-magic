@@ -9,11 +9,16 @@ Eloquent，提供一致的檔案接收、驗證、儲存、查詢、下載及刪
 
 - PHP 8.3 或以上
 - Laravel 12 或 13
-- PHP `curl` 與 `fileinfo`
+- PHP `ext-fileinfo`
 - 至少一個設定完成的 Laravel Filesystem disk
 
-圖片縮放另外需要 `intervention/image` 4.0 或以上，以及 GD 或 Imagick。ZIP
-批次下載另外需要 PHP `ext-zip`。
+Composer 會在安裝階段檢查 `ext-fileinfo`，因為 FileMagic 必須依實際檔案內容偵測
+MIME type，而不會信任檔名或 client 提供的 MIME type。
+
+透過 `fromUrl()` 匯入遠端 HTTP(S) 檔案時，另外需要 PHP `ext-curl`。缺少時其他功能
+仍可使用，但儲存遠端來源會拋出 `RemoteDownloadUnavailable`。圖片縮放另外需要
+`intervention/image` 4.0 或以上，以及 GD 或 Imagick。ZIP 批次下載另外需要 PHP
+`ext-zip`。
 
 ## 安裝
 
