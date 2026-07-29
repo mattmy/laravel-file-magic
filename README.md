@@ -19,7 +19,7 @@ Imagick. ZIP downloads additionally need PHP `ext-zip`.
 ## Installation
 
 ```bash
-composer require mattmy/file-magic
+composer require mattmy/laravel-file-magic
 php artisan vendor:publish --tag=file-magic-config
 php artisan vendor:publish --tag=file-magic-migrations
 php artisan migrate
@@ -78,23 +78,23 @@ $document = FileMagic::json([
 The complete guide, configuration reference, security notes, examples, and
 troubleshooting information are available at:
 
-**[Read the FileMagic documentation](https://mattmy.github.io/file-magic-docs/)**
+**[Read the FileMagic documentation](https://mattmy.github.io/laravel-file-magic-docs/)**
 
-- [Getting started](https://mattmy.github.io/file-magic-docs/guide/getting-started)
-- [Storing files](https://mattmy.github.io/file-magic-docs/guide/storing-files)
-- [Remote files](https://mattmy.github.io/file-magic-docs/guide/remote-files)
-- [Documents and images](https://mattmy.github.io/file-magic-docs/guide/documents-and-images)
-- [Querying files](https://mattmy.github.io/file-magic-docs/guide/querying-files)
-- [ZIP and deletion](https://mattmy.github.io/file-magic-docs/guide/zip-and-deletion)
-- [Models and exceptions](https://mattmy.github.io/file-magic-docs/guide/models-and-exceptions)
-- [API reference and troubleshooting](https://mattmy.github.io/file-magic-docs/guide/reference)
+- [Getting started](https://mattmy.github.io/laravel-file-magic-docs/guide/getting-started)
+- [Storing files](https://mattmy.github.io/laravel-file-magic-docs/guide/storing-files)
+- [Remote files](https://mattmy.github.io/laravel-file-magic-docs/guide/remote-files)
+- [Documents and images](https://mattmy.github.io/laravel-file-magic-docs/guide/documents-and-images)
+- [Querying files](https://mattmy.github.io/laravel-file-magic-docs/guide/querying-files)
+- [ZIP and deletion](https://mattmy.github.io/laravel-file-magic-docs/guide/zip-and-deletion)
+- [Models and exceptions](https://mattmy.github.io/laravel-file-magic-docs/guide/models-and-exceptions)
+- [API reference and troubleshooting](https://mattmy.github.io/laravel-file-magic-docs/guide/reference)
 
 ## Security
 
 Applications must authorize every file operation and retain Laravel request
 validation at the HTTP boundary. Treat original filenames, client MIME values,
 remote content, and stored bytes as untrusted. See the
-[security guide](https://mattmy.github.io/file-magic-docs/guide/reference#security)
+[security guide](https://mattmy.github.io/laravel-file-magic-docs/guide/reference#security)
 before accepting untrusted files or URLs.
 
 Report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
