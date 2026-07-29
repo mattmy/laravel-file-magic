@@ -18,7 +18,7 @@ Eloquent，提供一致的檔案接收、驗證、儲存、查詢、下載及刪
 ## 安裝
 
 ```bash
-composer require mattmy/file-magic
+composer require mattmy/laravel-file-magic
 php artisan vendor:publish --tag=file-magic-config
 php artisan vendor:publish --tag=file-magic-migrations
 php artisan migrate
@@ -76,23 +76,23 @@ $document = FileMagic::json([
 
 完整教學、設定參考、安全性說明、使用範例及常見問題請閱讀：
 
-**[開啟 FileMagic 繁體中文文件](https://mattmy.github.io/file-magic-docs/zh-TW/)**
+**[開啟 FileMagic 繁體中文文件](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/)**
 
-- [開始使用](https://mattmy.github.io/file-magic-docs/zh-TW/guide/getting-started)
-- [儲存檔案](https://mattmy.github.io/file-magic-docs/zh-TW/guide/storing-files)
-- [遠端檔案](https://mattmy.github.io/file-magic-docs/zh-TW/guide/remote-files)
-- [文件與圖片](https://mattmy.github.io/file-magic-docs/zh-TW/guide/documents-and-images)
-- [查詢檔案](https://mattmy.github.io/file-magic-docs/zh-TW/guide/querying-files)
-- [ZIP 與刪除](https://mattmy.github.io/file-magic-docs/zh-TW/guide/zip-and-deletion)
-- [Model 與例外](https://mattmy.github.io/file-magic-docs/zh-TW/guide/models-and-exceptions)
-- [API 參考與常見問題](https://mattmy.github.io/file-magic-docs/zh-TW/guide/reference)
+- [開始使用](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/getting-started)
+- [儲存檔案](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/storing-files)
+- [遠端檔案](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/remote-files)
+- [文件與圖片](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/documents-and-images)
+- [查詢檔案](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/querying-files)
+- [ZIP 與刪除](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/zip-and-deletion)
+- [Model 與例外](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/models-and-exceptions)
+- [API 參考與常見問題](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/reference)
 
 ## 安全性
 
 應用程式必須對每個檔案操作進行 authorization，並在 HTTP 邊界保留 Laravel
 request validation。原始檔名、client MIME、遠端內容及儲存完成的檔案都應視為
 不可信任資料。接受不可信任檔案或網址前，請先閱讀
-[安全性說明](https://mattmy.github.io/file-magic-docs/zh-TW/guide/reference#安全性注意事項)。
+[安全性說明](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/reference#安全性注意事項)。
 
 安全性問題請依照 [SECURITY.md](SECURITY.md) 私下回報。
 

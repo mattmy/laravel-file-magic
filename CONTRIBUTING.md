@@ -7,7 +7,7 @@ Thank you for helping improve FileMagic.
 FileMagic requires PHP 8.3 or later and Composer 2.
 
 ```bash
-git clone https://github.com/mattmy/file-magic.git
+git clone https://github.com/mattmy/laravel-file-magic.git
 cd file-magic
 composer install
 composer check
