@@ -260,6 +260,10 @@ $file = FileMagic::fromUrl(
 )->store();
 ```
 
+Passing `RemoteFileOptions` replaces the configured `remote` defaults for that
+operation; the values are not merged. Include every non-default host, port, and
+timeout required by the request.
+
 | Option | Type | Default | Behavior |
 | --- | --- | --- | --- |
 | `verifyTls` | `bool` | `true` | Verifies the HTTPS certificate, hostname, and chain |
@@ -346,6 +350,9 @@ $file = FileMagic::fromUrl(
 Allowed HTML is stored with its detected HTML MIME type and `.html` extension. HTML
 can execute script when served from an application origin, so keep it private and
 download it as an attachment unless the application sanitizes and isolates it.
+`allowHtml: true` only removes the remote HTML-specific rejection; the normal
+`allowed_mime_types`, `blocked_mime_types`, `allowMimeTypes()`, and
+`blockMimeTypes()` rules still apply.
 
 ### URL download security and performance
 
@@ -493,14 +500,17 @@ public function files(): MorphMany
 }
 ```
 
-Eager-load the relation from the owning model, then pass the already loaded file model into FileMagic:
+Eager-load the relation from the owning model, then pass an already loaded file
+model into FileMagic:
 
 ```php
 $post = Post::query()
-    ->with('attachment')
+    ->with('files')
     ->findOrFail($postId);
 
-return FileMagic::find($post->attachment)->download();
+$attachment = $post->files->firstOrFail();
+
+return FileMagic::find($attachment)->download();
 ```
 
 Passing an existing `StoredFile` model does not execute another database query.
@@ -575,7 +585,11 @@ All three forms preserve input order and remove duplicate models. IDs and UUIDs 
 
 Arrays and Collections must be one-dimensional. Every element must be a positive integer ID, valid UUID, or persisted `StoredFile`; invalid elements throw `InvalidFileTarget` instead of being silently removed.
 
-`one()` returns the first resolved `StoredFile` or `null`. `get()` returns an `Illuminate\Support\Collection<int, StoredFile>`, so the complete Laravel Collection API is available without exposing an Eloquent query builder.
+Valid IDs and UUIDs without a matching record are omitted. `one()` therefore returns
+the first resolved `StoredFile` or `null`, while operations that require a file,
+such as `download()` and `contents()`, throw `FileNotFound` when nothing resolves.
+`get()` returns an `Illuminate\Support\Collection<int, StoredFile>`, so the complete
+Laravel Collection API is available without exposing an Eloquent query builder.
 
 ## URLs
 
@@ -602,8 +616,10 @@ The disk must support the requested operation. Local temporary URLs require `ser
 ## Read and stream
 
 ```php
-if (FileMagic::find($target)->exists()) {
-    $smallContents = FileMagic::find($target)->contents();
+$file = FileMagic::find($target);
+
+if ($file->exists()) {
+    $smallContents = $file->contents();
 }
 ```
 
@@ -740,7 +756,7 @@ All exceptions extend `FileMagicException`.
 | `InvalidStoredFileModel` | Configured model does not extend the package `StoredFile` |
 | `FileTooLarge` | Byte limit exceeded |
 | `DisallowedMimeType` | MIME type rejected |
-| `FileWriteFailed` | Storage or collision failure |
+| `FileWriteFailed` | Storage write, collision, overwrite backup, or deletion failure |
 | `FileRecordFailed` | Database persistence failure |
 | `FileRecoveryFailed` | An overwrite failed and the original object could not be restored |
 | `PartialFileDeletion` | Only confirmed missing objects and their records were deleted |

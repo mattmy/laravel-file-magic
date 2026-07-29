@@ -281,6 +281,9 @@ $file = FileMagic::fromUrl(
 )->store();
 ```
 
+傳入 `RemoteFileOptions` 時，該物件會取代這次操作的 `remote` 全域預設值，不會與
+設定檔合併。請在物件中完整列出該請求需要的非預設 host、port 與 timeout。
+
 | Option | 型別 | 預設值 | 行為 |
 | --- | --- | --- | --- |
 | `verifyTls` | `bool` | `true` | 驗證 HTTPS certificate、hostname 與 certificate chain |
@@ -362,6 +365,9 @@ $file = FileMagic::fromUrl(
 
 允許後會使用實際 HTML MIME 與 `.html` 儲存。HTML 從應用程式同源顯示時可能執行
 script；除非應用程式會隔離並清理內容，否則應保持 private 並以 attachment 下載。
+`allowHtml: true` 只會略過遠端 HTML 專用的拒絕規則；一般的
+`allowed_mime_types`、`blocked_mime_types`、`allowMimeTypes()` 與
+`blockMimeTypes()` 規則仍然有效。
 
 ### 網址下載的安全性與效能
 
@@ -544,10 +550,12 @@ public function files(): MorphMany
 
 ```php
 $post = Post::query()
-    ->with('attachment')
+    ->with('files')
     ->findOrFail($postId);
 
-return FileMagic::find($post->attachment)->download();
+$attachment = $post->files->firstOrFail();
+
+return FileMagic::find($attachment)->download();
 ```
 
 傳入既有的 `StoredFile` Model 不會再次執行資料庫查詢。
@@ -626,7 +634,11 @@ $collection = FileMagic::find(collect([
 
 Array 與 Collection 必須是一維結構，每個元素都必須是正整數 ID、合法 UUID 或已儲存的 `StoredFile`。無效元素會拋出 `InvalidFileTarget`，不會被靜默移除。
 
-`one()` 會回傳第一個符合的 `StoredFile` 或 `null`；`get()` 會回傳 `Illuminate\Support\Collection<int, StoredFile>`，可使用完整的 Laravel Collection API，同時不會暴露 Eloquent query builder。
+合法但找不到紀錄的 ID 或 UUID 會從結果中省略，因此 `one()` 會回傳第一個符合的
+`StoredFile` 或 `null`；`download()`、`contents()` 等必須取得檔案的操作在沒有任何
+結果時則會拋出 `FileNotFound`。`get()` 會回傳
+`Illuminate\Support\Collection<int, StoredFile>`，可使用完整的 Laravel Collection
+API，同時不會暴露 Eloquent query builder。
 
 ## 取得 URL
 
@@ -667,7 +679,9 @@ $urls = FileMagic::find([
 檢查實體檔案是否存在：
 
 ```php
-if (FileMagic::find($target)->exists()) {
+$file = FileMagic::find($target);
+
+if ($file->exists()) {
     // 實體檔案存在。
 }
 ```
