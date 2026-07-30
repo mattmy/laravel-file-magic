@@ -32,8 +32,6 @@ php artisan vendor:publish --tag=file-magic-migrations
 php artisan migrate
 ```
 
-Laravel automatically discovers the service provider and `FileMagic` facade.
-
 ## Quick start
 
 Store an uploaded file:
