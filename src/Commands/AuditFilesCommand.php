@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Mattmy\FileMagic\Commands;
 
-use Illuminate\Console\Attributes\Description;
-use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
@@ -15,16 +13,13 @@ use InvalidArgumentException;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Support\StoredFileModelResolver;
 use RuntimeException;
+use Symfony\Component\Console\Input\InputOption;
 use Throwable;
 
-#[Signature('file-magic:audit
-    {--disk= : Audit only one configured Laravel filesystem disk}
-    {--chunk=' . self::DEFAULT_CHUNK_SIZE . ' : Number of database records processed per chunk}
-    {--delete-missing-records : Delete records whose storage objects are confirmed missing}
-    {--force : Skip confirmation when deleting missing records}')]
-#[Description('Audit FileMagic database records against their storage objects.')]
 final class AuditFilesCommand extends Command
 {
+    private const string COMMAND_NAME = 'file-magic:audit';
+
     private const int DEFAULT_CHUNK_SIZE = 500;
 
     private const int MAXIMUM_CHUNK_SIZE = 5000;
@@ -59,6 +54,30 @@ final class AuditFilesCommand extends Command
         private readonly StoredFileModelResolver $models,
     ) {
         parent::__construct();
+
+        $this->setName(self::COMMAND_NAME)
+            ->setDescription('Audit FileMagic database records against their storage objects.')
+            ->addOption(
+                'disk',
+                mode: InputOption::VALUE_REQUIRED,
+                description: 'Audit only one configured Laravel filesystem disk.',
+            )
+            ->addOption(
+                'chunk',
+                mode: InputOption::VALUE_REQUIRED,
+                description: 'Number of database records processed per chunk.',
+                default: (string) self::DEFAULT_CHUNK_SIZE,
+            )
+            ->addOption(
+                'delete-missing-records',
+                mode: InputOption::VALUE_NONE,
+                description: 'Delete records whose storage objects are confirmed missing.',
+            )
+            ->addOption(
+                'force',
+                mode: InputOption::VALUE_NONE,
+                description: 'Skip confirmation when deleting missing records.',
+            );
     }
 
     /**

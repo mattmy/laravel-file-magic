@@ -19,6 +19,11 @@ beforeEach(function (): void {
     Storage::fake('other');
 });
 
+afterEach(function (): void {
+    \config()->set('file-magic.model', StoredFile::class);
+    \config()->set('file-magic.table', 'stored_files');
+});
+
 it('reports a clean read-only audit', function (): void {
     FileMagic::fromContent('healthy')->store();
 
