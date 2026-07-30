@@ -6,39 +6,55 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-30
+
 ### Added
 
-- Initial strongly typed Laravel file-management implementation.
-- Unified `find()` API for IDs, UUIDs, stored file models, arrays, Collections,
-  and variadic targets.
-- Zero-query model resolution, ordered batch results, strict target validation,
-  and direct file operations.
-- Optional Intervention Image 4 processing with safe fallback for unsupported
-  file formats.
-- TXT, JSON, and CSV document generation through the standard `PendingFile`
-  storage flow.
-- Optional streamed ZIP downloads through `FileQuery::downloadZip()`, including
-  safe entry naming, configurable limits, and temporary-file cleanup.
-- PHP, Laravel, image driver, SQLite, and MySQL continuous-integration coverage.
-- Dependency auditing, Dependabot, contribution guidance, and a security policy.
-- Secure streamed HTTP(S) imports through `fromUrl()`, with immutable remote
-  options, TLS verification, SSRF protection, bounded redirects, byte limits,
-  HTML opt-in, and temporary-file cleanup.
-- Consistent batch deletion with partial-failure reconciliation and a structured
-  `PartialFileDeletion` exception.
-- A read-only-by-default `file-magic:audit` command for detecting database
-  records whose storage objects are missing, with opt-in confirmed cleanup.
+- Support for PHP 8.3 or later and Laravel 12 or 13.
+- A unified `PendingFile` workflow for uploaded files, local paths, strings or
+  binary content, Base64 input, remote HTTP(S) files, and generated documents.
+- Content-based MIME detection, configurable size and MIME restrictions,
+  normalized storage paths, visibility controls, metadata, ownership, and
+  streamed checksums.
+- TXT, JSON, and CSV generation through the standard storage workflow.
+- Optional best-effort image resizing with Intervention Image 4 and GD or
+  Imagick; unsupported image formats remain unchanged.
+- `Unique`, `Error`, and `Overwrite` collision policies, including streamed
+  local backups and compensating recovery when an overwrite fails.
+- A unified `find()` API accepting IDs, UUIDs, configured stored-file models,
+  arrays, Laravel Collections, and variadic targets.
+- Ordered batch lookup and standard `Illuminate\Support\Collection` results.
+- Stored-file operations for existence checks, URLs, temporary URLs, contents,
+  streams, downloads, and deletion.
+- Optional streamed ZIP downloads with safe entry names, configurable limits,
+  duplicate-name handling, Zip Slip protection, and temporary-file cleanup.
+- Consistency-aware batch deletion with partial-failure reconciliation and a
+  structured `PartialFileDeletion` exception.
+- A configurable stored-file model, database connection, table, primary key,
+  owner relation, and migration.
+- A read-only-by-default `file-magic:audit` Artisan command with disk filtering,
+  bounded database chunks, explicit missing-record cleanup, safe handling of
+  unknown storage states, and automation-friendly exit codes.
+- English and Traditional Chinese package documentation and a complete
+  bilingual documentation website.
+- Continuous integration for supported PHP and Laravel versions, SQLite,
+  MySQL 8.4, GD, Imagick, and optional-extension behavior.
+- Composer validation, Pest tests, Larastan analysis, Pint formatting checks,
+  dependency auditing, Dependabot, contribution guidance, and a security
+  policy.
 
-### Changed
+### Security
 
-- PHP `ext-curl` is now optional and required only for HTTP(S) imports through
-  `fromUrl()`; missing cURL support now raises `RemoteDownloadUnavailable`.
-- Composer now requires PHP `ext-fileinfo` because content-based MIME detection
-  is part of every file storage workflow.
-- `FileQuery::get()` returns a standard `Illuminate\Support\Collection`.
-- Storage locations use a fixed-length SHA-256 identity to keep MySQL indexes
-  within supported limits.
-- `Overwrite` now creates a streamed local temporary backup and restores the
-  original object and visibility when storage or database persistence fails.
-- Storage, lookup, and deletion now share the configured custom stored-file
-  model, including its connection, table, and primary key.
+- Required PHP Fileinfo for MIME inspection based on actual file contents
+  instead of filenames or client-provided MIME values.
+- Streamed remote HTTP(S) imports with TLS verification enabled by default,
+  strict URL validation, SSRF protection, DNS and redirect validation, private
+  network restrictions, byte limits, bounded redirects, HTML opt-in, and
+  temporary-file cleanup.
+- Safe storage path and filename normalization, blocked MIME defaults, ZIP entry
+  validation, and strict file-target resolution.
+- Preservation of database records when storage state cannot be confirmed
+  during deletion or consistency auditing.
+
+[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/mattmy/laravel-file-magic/releases/tag/v0.1.0
