@@ -26,6 +26,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
   HTML opt-in, and temporary-file cleanup.
 - Consistent batch deletion with partial-failure reconciliation and a structured
   `PartialFileDeletion` exception.
+- A read-only-by-default `file-magic:audit` command for detecting database
+  records whose storage objects are missing, with opt-in confirmed cleanup.
 
 ### Changed
 
