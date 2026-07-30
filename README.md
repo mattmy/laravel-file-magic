@@ -80,6 +80,11 @@ $document = FileMagic::json([
 - Custom stored-file model and table support
 - English and Traditional Chinese documentation
 
+`Overwrite` creates a complete backup on the PHP server's local temporary disk
+before replacing an object. It uses additional disk space and I/O, so it is
+slower than normal storage; prefer the default `Unique` policy unless the same
+storage path must be preserved.
+
 ## Documentation
 
 The complete guide, configuration reference, security notes, examples, and
@@ -97,6 +102,22 @@ troubleshooting information are available at:
 - [Models and exceptions](https://mattmy.github.io/laravel-file-magic-docs/guide/models-and-exceptions)
 - [API reference and troubleshooting](https://mattmy.github.io/laravel-file-magic-docs/guide/reference)
 
+## Consistency audits
+
+`php artisan file-magic:audit` checks whether every database record still has
+its `disk + path` object. It is read-only by default. Each record causes one
+filesystem `exists()` call; remote disks such as S3 can therefore add execution
+time and request charges. `--chunk` limits database memory, not storage requests.
+The command never lists storage or deletes physical objects.
+
+Cleanup requires `--delete-missing-records` and confirmation, or `--force` in
+non-interactive environments. Cleanup uses one bulk database delete per chunk,
+does not dispatch per-model Eloquent events, and is not one transaction: if a
+later chunk fails, earlier chunks may already be deleted. Storage or network
+errors are treated as unknown and never as proof that an object is missing.
+Read the [audit guide](https://mattmy.github.io/laravel-file-magic-docs/guide/maintenance)
+before enabling cleanup or scheduling the command.
+
 ## Security
 
 Applications must authorize every file operation and retain Laravel request
@@ -106,21 +127,6 @@ remote content, and stored bytes as untrusted. See the
 before accepting untrusted files or URLs.
 
 Report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
-
-## Consistency audits
-
-`php artisan file-magic:audit` checks whether every database record still has
-its `disk + path` object. It is read-only by default. Each record causes one
-filesystem `exists()` call; remote disks such as S3 can therefore add execution
-time and request charges. `--chunk` limits database memory, not storage requests.
-
-Cleanup requires `--delete-missing-records` and confirmation, or `--force` in
-non-interactive environments. Cleanup uses one bulk database delete per chunk,
-does not dispatch per-model Eloquent events, and is not one transaction: if a
-later chunk fails, earlier chunks may already be deleted. Storage or network
-errors are treated as unknown and never as proof that an object is missing.
-Read the [audit guide](https://mattmy.github.io/laravel-file-magic-docs/guide/maintenance)
-before enabling cleanup or scheduling the command.
 
 ## License
 
