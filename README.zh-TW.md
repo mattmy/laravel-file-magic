@@ -77,6 +77,10 @@ $document = FileMagic::json([
 - 支援自訂 StoredFile Model 與資料表
 - 完整英文與繁體中文文件
 
+`Overwrite` 會在取代 object 前，先將完整舊檔案備份到 PHP 伺服器的本機暫存硬碟，
+因此會占用額外硬碟空間與 I/O，整體效能也低於一般儲存。除非必須維持相同 storage
+path，否則建議使用預設的 `Unique`。
+
 ## 完整文件
 
 完整教學、設定參考、安全性說明、使用範例及常見問題請閱讀：
@@ -92,6 +96,20 @@ $document = FileMagic::json([
 - [一致性稽核](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/maintenance)
 - [Model 與例外](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/models-and-exceptions)
 - [API 參考與常見問題](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/reference)
+
+## 一致性稽核
+
+`php artisan file-magic:audit` 會檢查每筆 database record 是否仍有對應的
+`disk + path` object，預設完全唯讀。每筆 record 都會呼叫一次 filesystem
+`exists()`；S3 等遠端 disk 因此可能增加執行時間與 request 費用。`--chunk` 只限制
+database memory，不會減少 storage requests。此指令不會列舉 storage，也不會刪除
+任何實體檔案。
+
+清理時必須使用 `--delete-missing-records` 並確認；非互動環境還要使用 `--force`。
+清理會在每個 chunk 執行一次 database bulk delete，不觸發逐筆 Eloquent model
+events，也不是包住整個指令的單一 transaction；後段失敗時，前面 chunks 可能已經
+刪除。Storage 或網路錯誤只代表狀態不明，絕不會被當成 object 缺失的證據。啟用清理
+或排程前，請先閱讀[一致性稽核文件](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/maintenance)。
 
 ## 安全性
 
