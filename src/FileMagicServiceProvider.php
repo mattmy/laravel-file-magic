@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic;
 
 use Illuminate\Support\ServiceProvider;
+use Mattmy\FileMagic\Commands\AuditFilesCommand;
 use Mattmy\FileMagic\Contracts\HostResolver;
 use Mattmy\FileMagic\Support\NativeHostResolver;
 
@@ -26,6 +27,10 @@ final class FileMagicServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $timestamp = \date('Y_m_d_His');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([AuditFilesCommand::class]);
+        }
 
         $this->publishes([
             __DIR__ . '/../config/file-magic.php' => \config_path('file-magic.php'),

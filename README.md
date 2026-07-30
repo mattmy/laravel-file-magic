@@ -76,7 +76,7 @@ $document = FileMagic::json([
 - SSRF-resistant URL imports with TLS verification enabled by default
 - Best-effort image resizing with Intervention Image 4
 - Collision policies with recovery for failed overwrite operations
-- Ordered batch lookup and consistency-aware batch deletion
+- Ordered batch lookup, consistency-aware batch deletion, and storage audits
 - Custom stored-file model and table support
 - English and Traditional Chinese documentation
 
@@ -93,6 +93,7 @@ troubleshooting information are available at:
 - [Documents and images](https://mattmy.github.io/laravel-file-magic-docs/guide/documents-and-images)
 - [Querying files](https://mattmy.github.io/laravel-file-magic-docs/guide/querying-files)
 - [ZIP and deletion](https://mattmy.github.io/laravel-file-magic-docs/guide/zip-and-deletion)
+- [Consistency audits](https://mattmy.github.io/laravel-file-magic-docs/guide/maintenance)
 - [Models and exceptions](https://mattmy.github.io/laravel-file-magic-docs/guide/models-and-exceptions)
 - [API reference and troubleshooting](https://mattmy.github.io/laravel-file-magic-docs/guide/reference)
 
@@ -105,6 +106,21 @@ remote content, and stored bytes as untrusted. See the
 before accepting untrusted files or URLs.
 
 Report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
+
+## Consistency audits
+
+`php artisan file-magic:audit` checks whether every database record still has
+its `disk + path` object. It is read-only by default. Each record causes one
+filesystem `exists()` call; remote disks such as S3 can therefore add execution
+time and request charges. `--chunk` limits database memory, not storage requests.
+
+Cleanup requires `--delete-missing-records` and confirmation, or `--force` in
+non-interactive environments. Cleanup uses one bulk database delete per chunk,
+does not dispatch per-model Eloquent events, and is not one transaction: if a
+later chunk fails, earlier chunks may already be deleted. Storage or network
+errors are treated as unknown and never as proof that an object is missing.
+Read the [audit guide](https://mattmy.github.io/laravel-file-magic-docs/guide/maintenance)
+before enabling cleanup or scheduling the command.
 
 ## License
 

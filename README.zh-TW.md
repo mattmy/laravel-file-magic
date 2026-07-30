@@ -73,7 +73,7 @@ $document = FileMagic::json([
 - 預設驗證 TLS 且具備 SSRF 防護的網址匯入
 - 使用 Intervention Image 4 的 best-effort 圖片縮放
 - 支援檔名碰撞策略，並在 Overwrite 失敗時還原
-- 保留順序的批次查詢與維持一致性的批次刪除
+- 保留順序的批次查詢、維持一致性的批次刪除與 storage 稽核
 - 支援自訂 StoredFile Model 與資料表
 - 完整英文與繁體中文文件
 
@@ -89,6 +89,7 @@ $document = FileMagic::json([
 - [文件與圖片](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/documents-and-images)
 - [查詢檔案](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/querying-files)
 - [ZIP 與刪除](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/zip-and-deletion)
+- [一致性稽核](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/maintenance)
 - [Model 與例外](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/models-and-exceptions)
 - [API 參考與常見問題](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/reference)
 
@@ -100,6 +101,19 @@ request validation。原始檔名、client MIME、遠端內容及儲存完成的
 [安全性說明](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/reference#安全性注意事項)。
 
 安全性問題請依照 [SECURITY.md](SECURITY.md) 私下回報。
+
+## 一致性稽核
+
+`php artisan file-magic:audit` 會檢查每筆 database record 是否仍有對應的
+`disk + path` object，預設完全唯讀。每筆 record 都會呼叫一次 filesystem
+`exists()`；S3 等遠端 disk 因此可能增加執行時間與 request 費用。`--chunk` 只限制
+database memory，不會減少 storage requests。
+
+清理時必須使用 `--delete-missing-records` 並確認；非互動環境還要使用 `--force`。
+清理會在每個 chunk 執行一次 database bulk delete，不觸發逐筆 Eloquent model
+events，也不是包住整個指令的單一 transaction；後段失敗時，前面 chunks 可能已經
+刪除。Storage 或網路錯誤只代表狀態不明，絕不會被當成 object 缺失的證據。啟用清理
+或排程前，請先閱讀[一致性稽核文件](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/guide/maintenance)。
 
 ## 授權
 
