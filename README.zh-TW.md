@@ -29,8 +29,6 @@ php artisan vendor:publish --tag=file-magic-migrations
 php artisan migrate
 ```
 
-Laravel 會自動發現 Service Provider 與 `FileMagic` Facade。
-
 ## 快速開始
 
 儲存上傳檔案：
