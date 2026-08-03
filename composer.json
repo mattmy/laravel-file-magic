@@ -1,7 +1,7 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
     "name": "mattmy/laravel-file-magic",
-    "description": "A strongly typed file management package for Laravel.",
+    "description": "Securely accept, validate, store, query, download, and delete files through one fluent Laravel API.",
     "type": "library",
     "license": "MIT",
     "require": {

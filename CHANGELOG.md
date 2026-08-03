@@ -6,6 +6,13 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-03
+
+### Changed
+
+- Clarified the Composer package description to better communicate FileMagic's
+  secure, fluent file-management workflow.
+
 ## [0.1.0] - 2026-07-30
 
 ### Added
@@ -56,5 +63,6 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 - Preservation of database records when storage state cannot be confirmed
   during deletion or consistency auditing.
 
-[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/mattmy/laravel-file-magic/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mattmy/laravel-file-magic/releases/tag/v0.1.0
