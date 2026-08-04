@@ -1,10 +1,23 @@
 # FileMagic
 
-[English](README.md) | [繁體中文](README.zh-TW.md)
+[繁體中文](README.zh-TW.md)
 
-FileMagic is a file-management package built exclusively for Laravel. It provides
-one consistent workflow for accepting, validating, storing, querying, downloading,
-and deleting files through Laravel Filesystem and Eloquent.
+Manage files in Laravel through one clear API. FileMagic stores file records with Eloquent
+and works with Laravel Filesystem disks, so you can upload, find, read, download, and delete
+files without building the same workflow for every source.
+
+## What you can do
+
+- Store uploaded files, local files, content, Base64, and remote HTTP(S) files.
+- Generate and store TXT, JSON, and CSV documents.
+- Choose the disk, directory, filename, visibility, and collision behavior for each file.
+- Limit file size and allow or block MIME types.
+- Attach metadata and associate files with Eloquent models.
+- Resize supported images before storage.
+- Find files by ID, UUID, model, array, or Laravel Collection.
+- Read file contents, open streams, create URLs, and return downloads.
+- Download multiple files as ZIP or delete files in batches.
+- Audit database records whose physical files are missing.
 
 ## Requirements
 
@@ -13,15 +26,8 @@ and deleting files through Laravel Filesystem and Eloquent.
 - PHP `ext-fileinfo`
 - A configured Laravel Filesystem disk
 
-Composer checks `ext-fileinfo` during installation because FileMagic detects
-MIME types from actual file contents instead of trusting filenames or
-client-provided MIME types.
-
-Remote HTTP(S) imports through `fromUrl()` additionally need PHP `ext-curl`.
-Without it, all other features remain available, while storing a remote source
-throws `RemoteDownloadUnavailable`. Image resizing additionally needs
-`intervention/image` 4.0 or later and GD or Imagick. ZIP downloads additionally
-need PHP `ext-zip`.
+Remote files need PHP `ext-curl`. Image resizing needs Intervention Image 4 with GD or
+Imagick. ZIP downloads need PHP `ext-zip`.
 
 ## Installation
 
@@ -34,117 +40,126 @@ php artisan migrate
 
 ## Quick start
 
-Store an uploaded file:
-
 ```php
 use Mattmy\FileMagic\Facades\FileMagic;
 
-$file = FileMagic::fromUpload($uploadedFile)
+$file = FileMagic::fromUpload($request->file('document'))
     ->onDisk('local')
     ->inDirectory('documents')
     ->named('contract')
     ->store();
-```
-
-Retrieve it by ID, UUID, model, array, or Laravel Collection:
-
-```php
-$file = FileMagic::find($uuid)->one();
 
 return FileMagic::find($file)->download();
 ```
 
-The same `PendingFile` workflow supports local paths, content, Base64, remote
-HTTP(S) files, and generated TXT, JSON, and CSV documents:
+## Store files from different sources
 
 ```php
-$document = FileMagic::json([
-    'message' => 'Hello',
-])
+FileMagic::fromUpload($uploadedFile)->store();
+FileMagic::fromPath($trustedPath)->store();
+FileMagic::fromContent($contents, 'report.pdf')->store();
+FileMagic::fromBase64($base64, 'avatar.png')->store();
+FileMagic::fromUrl('https://example.com/manual.pdf')->store();
+```
+
+Generate documents with the same storage options:
+
+```php
+FileMagic::text('Hello')->named('message')->store();
+FileMagic::json(['status' => 'ready'])->named('status')->store();
+FileMagic::csv($rows)->named('report')->store();
+```
+
+## Configure a file
+
+```php
+use Mattmy\FileMagic\Enums\CollisionPolicy;
+use Mattmy\FileMagic\Enums\FileVisibility;
+
+$file = FileMagic::fromUpload($uploadedFile)
     ->onDisk('s3')
-    ->inDirectory('exports')
-    ->named('message')
+    ->inDirectory('accounts/42/contracts')
+    ->named('signed-contract')
+    ->visibility(FileVisibility::Private)
+    ->onCollision(CollisionPolicy::Unique)
+    ->maxSize(10 * 1024 * 1024)
+    ->allowMimeTypes(['application/pdf'])
+    ->withMetadata(['category' => 'contract'])
+    ->ownedBy($user)
     ->store();
 ```
 
-## Highlights
+Use `resizeImage()` when supported images should be reduced before storage:
 
-- Strict content inspection, size limits, MIME allowlists, and safe path handling
-- Streaming storage, reads, downloads, and bounded ZIP creation
-- SSRF-resistant URL imports with TLS verification enabled by default
-- Best-effort image resizing with Intervention Image 4
-- Collision policies with recovery for failed overwrite operations
-- Ordered batch lookup, consistency-aware batch deletion, and storage audits
-- Custom stored-file model and table support
-- English and Traditional Chinese documentation
+```php
+$image = FileMagic::fromUpload($uploadedImage)
+    ->resizeImage(maxWidth: 1200, quality: 80)
+    ->store();
+```
 
-`Overwrite` creates a complete backup on the PHP server's local temporary disk
-before replacing an object. It uses additional disk space and I/O, so it is
-slower than normal storage; prefer the default `Unique` policy unless the same
-storage path must be preserved.
+## Find and use stored files
+
+```php
+$file = FileMagic::find($uuid)->one();
+$files = FileMagic::find([$firstId, $secondUuid])->get();
+$exists = FileMagic::find($uuid)->exists();
+$url = FileMagic::find($uuid)->url();
+$temporaryUrl = FileMagic::find($uuid)->temporaryUrl(now()->addMinutes(15));
+$contents = FileMagic::find($uuid)->contents();
+$stream = FileMagic::find($uuid)->readStream();
+
+return FileMagic::find($uuid)->download();
+```
+
+Use `readStream()` instead of `contents()` for large files, and close the returned stream
+when finished.
+
+## ZIP downloads and deletion
+
+```php
+return FileMagic::find($targets)->downloadZip('documents');
+```
+
+```php
+$deleted = FileMagic::find($targets)->delete();
+```
+
+Applications must authorize every file before reading, downloading, or deleting it.
+
+## Consistency audits
+
+Check whether database records still have matching files on storage:
+
+```bash
+php artisan file-magic:audit
+```
+
+The command is read-only unless `--delete-missing-records` is supplied. Remote disks may
+add network time and storage request charges, so review the audit guide before scheduling
+cleanup.
+
+## Handle errors
+
+All package exceptions extend `FileMagicException`:
+
+```php
+use Mattmy\FileMagic\Exceptions\FileMagicException;
+
+try {
+    $file = FileMagic::fromUpload($uploadedFile)->store();
+} catch (FileMagicException $exception) {
+    report($exception);
+}
+```
 
 ## Documentation
 
-The complete guide, configuration reference, security notes, examples, and
-troubleshooting information are available at:
-
-**[Read the FileMagic documentation](https://mattmy.github.io/laravel-file-magic-docs/)**
-
-- [Getting started](https://mattmy.github.io/laravel-file-magic-docs/guide/getting-started)
-- [Storing files](https://mattmy.github.io/laravel-file-magic-docs/guide/storing-files)
-- [Remote files](https://mattmy.github.io/laravel-file-magic-docs/guide/remote-files)
-- [Documents and images](https://mattmy.github.io/laravel-file-magic-docs/guide/documents-and-images)
-- [Querying files](https://mattmy.github.io/laravel-file-magic-docs/guide/querying-files)
-- [ZIP and deletion](https://mattmy.github.io/laravel-file-magic-docs/guide/zip-and-deletion)
-- [Consistency audits](https://mattmy.github.io/laravel-file-magic-docs/guide/maintenance)
-- [Models and exceptions](https://mattmy.github.io/laravel-file-magic-docs/guide/models-and-exceptions)
-- [API reference and troubleshooting](https://mattmy.github.io/laravel-file-magic-docs/guide/reference)
-
-## Consistency audits
-
-`php artisan file-magic:audit` checks whether every database record still has
-its `disk + path` object. It is read-only by default. Each record causes one
-filesystem `exists()` call; remote disks such as S3 can therefore add execution
-time and request charges. `--chunk` limits database memory, not storage requests.
-The command never lists storage or deletes physical objects.
-
-Cleanup requires `--delete-missing-records` and confirmation, or `--force` in
-non-interactive environments. Cleanup uses one bulk database delete per chunk,
-does not dispatch per-model Eloquent events, and is not one transaction: if a
-later chunk fails, earlier chunks may already be deleted. Storage or network
-errors are treated as unknown and never as proof that an object is missing.
-Read the [audit guide](https://mattmy.github.io/laravel-file-magic-docs/guide/maintenance)
-before enabling cleanup or scheduling the command.
-
-## Security
-
-Applications must authorize every file operation and retain Laravel request
-validation at the HTTP boundary. Treat original filenames, client MIME values,
-remote content, and stored bytes as untrusted. See the
-[security guide](https://mattmy.github.io/laravel-file-magic-docs/guide/reference#security)
-before accepting untrusted files or URLs.
+For every method, field, parameter, exception, configuration option, performance note, and
+security recommendation, see the
+[FileMagic documentation](https://mattmy.github.io/laravel-file-magic-docs/).
 
 Report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
-
-## Consistency audits
-
-`php artisan file-magic:audit` checks whether every database record still has
-its `disk + path` object. It is read-only by default. Each record causes one
-filesystem `exists()` call; remote disks such as S3 can therefore add execution
-time and request charges. `--chunk` limits database memory, not storage requests.
-
-Cleanup requires `--delete-missing-records` and confirmation, or `--force` in
-non-interactive environments. Cleanup uses one bulk database delete per chunk,
-does not dispatch per-model Eloquent events, and is not one transaction: if a
-later chunk fails, earlier chunks may already be deleted. Storage or network
-errors are treated as unknown and never as proof that an object is missing.
-Read the [audit guide](https://mattmy.github.io/laravel-file-magic-docs/guide/maintenance)
-before enabling cleanup or scheduling the command.
 
 ## License
 
 FileMagic is open-source software licensed under the [MIT License](LICENSE).
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request. Releases
-follow [Semantic Versioning](https://semver.org/) and are documented in
-[CHANGELOG.md](CHANGELOG.md).
