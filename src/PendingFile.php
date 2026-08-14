@@ -12,6 +12,7 @@ use Mattmy\FileMagic\Contracts\SizeLimitedFileSource;
 use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
 use Mattmy\FileMagic\Enums\FileVisibility;
+use Mattmy\FileMagic\Exceptions\InvalidFileOwner;
 use Mattmy\FileMagic\Models\StoredFile;
 
 final class PendingFile
@@ -153,6 +154,15 @@ final class PendingFile
      */
     public function ownedBy(Model $owner): self
     {
+        $key = $owner->getKey();
+
+        if (
+            $owner->exists === false ||
+            (\is_int($key) === false && (\is_string($key) === false || $key === ''))
+        ) {
+            throw new InvalidFileOwner('The file owner must already be persisted.');
+        }
+
         $this->owner = $owner;
 
         return $this;

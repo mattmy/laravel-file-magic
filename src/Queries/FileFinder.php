@@ -91,11 +91,7 @@ final readonly class FileFinder
     private function normalizeTarget(mixed $target): int|string|StoredFile
     {
         if ($target instanceof StoredFile) {
-            if ($target->exists === false) {
-                throw new InvalidFileTarget('A file model target must already exist.');
-            }
-
-            return $target;
+            return $this->models->validateTarget($target);
         }
 
         if (\is_int($target) && $target > 0) {
