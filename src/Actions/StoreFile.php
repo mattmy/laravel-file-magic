@@ -176,7 +176,17 @@ final readonly class StoreFile
         }
 
         if ($pathExisted === false) {
-            $filesystem->delete($path);
+            try {
+                if ($filesystem->delete($path) === false) {
+                    throw new FileWriteFailed('The newly written file could not be removed during recovery.');
+                }
+            } catch (Throwable $recoveryFailure) {
+                throw new FileRecoveryFailed(
+                    'The newly written file could not be removed after an operation failure.',
+                    $operationFailure,
+                    $recoveryFailure,
+                );
+            }
         }
     }
 
@@ -270,13 +280,14 @@ final readonly class StoreFile
         CollisionPolicy $policy,
     ): StoredFile {
         $modelClass = $this->models->resolve();
+        $model = new $modelClass();
         $locationHash = $this->locationHash($disk, $path);
 
         /** @var StoredFile|null $file */
         $file = $policy === CollisionPolicy::Overwrite
-            ? $modelClass::query()->where('location_hash', $locationHash)->first()
+            ? $model->newQueryWithoutScopes()->where('location_hash', $locationHash)->first()
             : null;
-        $file ??= new $modelClass();
+        $file ??= $model;
         $file->fill([
             'disk' => $disk,
             'path' => $path,

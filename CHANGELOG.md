@@ -6,6 +6,14 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ## [Unreleased]
 
+### Changed
+
+- Validate model targets against the configured model before queries or filesystem
+  operations, including their connection, table, and primary key.
+- Reject unsaved owners and owners without an integer or non-empty string key.
+- Make overwrite identity lookups ignore global scopes and preserve both causes
+  when cleanup of a newly written object fails.
+
 ## [0.1.1] - 2026-08-03
 
 ### Changed

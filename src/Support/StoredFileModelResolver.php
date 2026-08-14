@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic\Support;
 
 use Illuminate\Contracts\Config\Repository as Config;
+use Mattmy\FileMagic\Exceptions\InvalidFileTarget;
 use Mattmy\FileMagic\Exceptions\InvalidStoredFileModel;
 use Mattmy\FileMagic\Models\StoredFile;
 
@@ -32,5 +33,28 @@ final readonly class StoredFileModelResolver
         }
 
         return $modelClass;
+    }
+
+    /**
+     * Validate that a persisted model target matches the configured file model.
+     */
+    public function validateTarget(StoredFile $target): StoredFile
+    {
+        $modelClass = $this->resolve();
+        $configured = new $modelClass();
+        $key = $target->getKey();
+
+        if (
+            $target->exists === false ||
+            (\is_int($key) === false && (\is_string($key) === false || $key === '')) ||
+            $target instanceof $modelClass === false ||
+            $target->getConnection()->getName() !== $configured->getConnection()->getName() ||
+            $target->getTable() !== $configured->getTable() ||
+            $target->getKeyName() !== $configured->getKeyName()
+        ) {
+            throw new InvalidFileTarget('The file model target is incompatible with the configured file model.');
+        }
+
+        return $target;
     }
 }
