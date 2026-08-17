@@ -13,6 +13,12 @@ return [
         'application/x-php',
     ],
     'collision' => 'unique',
+    'collision_lock' => [
+        'enabled' => false,
+        'store' => null,
+        'lease_seconds' => 300,
+        'wait_seconds' => 10,
+    ],
     'checksum_algorithm' => 'sha256',
     'temporary_url_ttl' => 5,
     'model' => Mattmy\FileMagic\Models\StoredFile::class,

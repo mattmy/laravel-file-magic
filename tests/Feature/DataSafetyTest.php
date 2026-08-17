@@ -86,8 +86,8 @@ it('preserves record and cleanup failures when a newly written object cannot be 
 
     $this->app->instance(FilesystemFactory::class, $factory);
     \config()->set('file-magic.model', FailingStoredFile::class);
-    $factory->shouldReceive('disk')->twice()->with('testing')->andReturn($filesystem);
-    $filesystem->shouldReceive('exists')->twice()->with('files/new.txt')->andReturnFalse();
+    $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
+    $filesystem->shouldReceive('exists')->once()->with('files/new.txt')->andReturnFalse();
     $filesystem->shouldReceive('put')->once()->andReturnTrue();
     $filesystem->shouldReceive('delete')->once()->with('files/new.txt')->andReturnFalse();
 
@@ -109,8 +109,8 @@ it('preserves record and cleanup failures when deleting a newly written object t
 
     $this->app->instance(FilesystemFactory::class, $factory);
     \config()->set('file-magic.model', FailingStoredFile::class);
-    $factory->shouldReceive('disk')->twice()->with('testing')->andReturn($filesystem);
-    $filesystem->shouldReceive('exists')->twice()->with('files/new.txt')->andReturnFalse();
+    $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
+    $filesystem->shouldReceive('exists')->once()->with('files/new.txt')->andReturnFalse();
     $filesystem->shouldReceive('put')->once()->andReturnTrue();
     $filesystem->shouldReceive('delete')->once()->with('files/new.txt')
         ->andThrow(new \RuntimeException('Simulated cleanup failure.'));

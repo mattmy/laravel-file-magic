@@ -23,6 +23,7 @@ use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\PendingFile;
 use Mattmy\FileMagic\Sources\RemoteFileSource;
+use Mattmy\FileMagic\Support\CollisionLock;
 use Mattmy\FileMagic\Support\ExtensionResolver;
 use Mattmy\FileMagic\Support\FileInspector;
 use Mattmy\FileMagic\Support\FileMagicConfig;
@@ -47,6 +48,7 @@ final readonly class StoreFile
         private PathNormalizer $paths,
         private ImageProcessor $images,
         private OverwriteBackupFactory $overwriteBackups,
+        private CollisionLock $collisionLock,
         private StoredFileModelResolver $models,
         private FileMagicConfig $fileMagicConfig,
     ) {}
@@ -95,12 +97,63 @@ final readonly class StoreFile
         }
 
         $extension = $this->extensions->resolve($metadata->mimeType);
-        $path = $directory === ''
+        $requestedPath = $directory === ''
             ? "{$filename}.{$extension}"
             : "{$directory}/{$filename}.{$extension}";
-        $path = $this->resolveCollision($diskName, $path, $policy);
-        $filename = \pathinfo($path, PATHINFO_FILENAME);
+
+        $path = $requestedPath;
+
+        while (true) {
+            $storedFile = $this->collisionLock->run(
+                $diskName,
+                $path,
+                fn (): StoredFile|false => $this->storeAtPath(
+                    $pending,
+                    $metadata,
+                    $source,
+                    $disk,
+                    $diskName,
+                    $path,
+                    $extension,
+                    $visibility,
+                    $policy,
+                    $model,
+                ),
+            );
+
+            if ($storedFile instanceof StoredFile) {
+                return $storedFile;
+            }
+
+            $path = $this->uniquePath($requestedPath);
+        }
+    }
+
+    /**
+     * Store one candidate while its disk and path lock is held.
+     */
+    private function storeAtPath(
+        PendingFile $pending,
+        FileMetadata $metadata,
+        FileSource $source,
+        Filesystem $disk,
+        string $diskName,
+        string $path,
+        string $extension,
+        FileVisibility $visibility,
+        CollisionPolicy $policy,
+        StoredFile $model,
+    ): StoredFile|false {
         $pathExisted = $disk->exists($path);
+
+        if ($pathExisted && $policy === CollisionPolicy::Unique) {
+            return false;
+        }
+
+        if ($pathExisted && $policy === CollisionPolicy::Error) {
+            throw new FileWriteFailed("A file already exists at [{$path}].");
+        }
+
         $backup = $this->createOverwriteBackup($disk, $path, $policy, $pathExisted);
 
         try {
@@ -123,7 +176,7 @@ final readonly class StoreFile
                     $metadata,
                     $diskName,
                     $path,
-                    $filename,
+                    \pathinfo($path, PATHINFO_FILENAME),
                     $extension,
                     $visibility,
                     $policy,
@@ -266,30 +319,17 @@ final readonly class StoreFile
     }
 
     /**
-     * Resolve a safe path according to the selected collision policy.
+     * Add a random collision suffix to the original requested path.
      */
-    private function resolveCollision(string $disk, string $path, CollisionPolicy $policy): string
+    private function uniquePath(string $path): string
     {
-        $filesystem = $this->filesystems->disk($disk);
-
-        if ($filesystem->exists($path) === false || $policy === CollisionPolicy::Overwrite) {
-            return $path;
-        }
-
-        if ($policy === CollisionPolicy::Error) {
-            throw new FileWriteFailed("A file already exists at [{$path}].");
-        }
-
         $extension = \pathinfo($path, PATHINFO_EXTENSION);
         $basename = \pathinfo($path, PATHINFO_FILENAME);
         $directory = \pathinfo($path, PATHINFO_DIRNAME);
 
-        do {
-            $uniqueName = "{$basename}-" . Str::lower(Str::random(12)) . ".{$extension}";
-            $uniquePath = $directory === '.' ? $uniqueName : "{$directory}/{$uniqueName}";
-        } while ($filesystem->exists($uniquePath));
+        $uniqueName = "{$basename}-" . Str::lower(Str::random(12)) . ".{$extension}";
 
-        return $uniquePath;
+        return $directory === '.' ? $uniqueName : "{$directory}/{$uniqueName}";
     }
 
     /**

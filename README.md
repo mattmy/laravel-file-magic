@@ -97,6 +97,13 @@ $image = FileMagic::fromUpload($uploadedImage)
     ->store();
 ```
 
+Collision locking is disabled by default, so storing files does not require a lock-capable
+cache store. Set `collision_lock.enabled` to `true` to serialize writes to each disk and path.
+When enabled, multi-server deployments must use one shared lock backend, the `array` store is
+only suitable for single-process tests, and `collision_lock.lease_seconds` must exceed the
+slowest write and recovery operation. Disabled mode does not protect concurrent writers from
+TOCTOU races. See the full documentation for the cooperative-lock guarantee boundary.
+
 ## Find and use stored files
 
 ```php

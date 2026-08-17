@@ -62,8 +62,8 @@ it('restores an existing object when overwrite storage returns false', function 
     $restoredContents = null;
 
     $this->app->instance(FilesystemFactory::class, $factory);
-    $factory->shouldReceive('disk')->twice()->with('testing')->andReturn($filesystem);
-    $filesystem->shouldReceive('exists')->twice()->with('files/same.txt')->andReturnTrue();
+    $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
+    $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('private');
     $filesystem->shouldReceive('readStream')->once()->with('files/same.txt')->andReturn(
         streamContaining('old contents'),
@@ -102,8 +102,8 @@ it('does not start overwrite when the original visibility cannot be backed up', 
     $factory = \Mockery::mock(FilesystemFactory::class);
 
     $this->app->instance(FilesystemFactory::class, $factory);
-    $factory->shouldReceive('disk')->twice()->with('testing')->andReturn($filesystem);
-    $filesystem->shouldReceive('exists')->twice()->with('files/same.txt')->andReturnTrue();
+    $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
+    $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('unsupported');
     $filesystem->shouldNotReceive('readStream');
     $filesystem->shouldNotReceive('put');
@@ -120,8 +120,8 @@ it('preserves operation and recovery failures when overwrite restoration fails',
     $factory = \Mockery::mock(FilesystemFactory::class);
 
     $this->app->instance(FilesystemFactory::class, $factory);
-    $factory->shouldReceive('disk')->twice()->with('testing')->andReturn($filesystem);
-    $filesystem->shouldReceive('exists')->twice()->with('files/same.txt')->andReturnTrue();
+    $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
+    $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('private');
     $filesystem->shouldReceive('readStream')->once()->with('files/same.txt')->andReturn(
         streamContaining('old contents'),

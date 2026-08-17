@@ -19,6 +19,10 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 - Reject unsaved owners and owners without an integer or non-empty string key.
 - Make overwrite identity lookups ignore global scopes and preserve both causes
   when cleanup of a newly written object fails.
+- Add opt-in Laravel atomic cache locks for collision checks, writes, record
+  persistence, and compensation. Locking is disabled by default for backward
+  compatibility and prevents cooperating writers from overwriting or deleting
+  each other's objects when enabled.
 
 ## [0.1.1] - 2026-08-03
 
