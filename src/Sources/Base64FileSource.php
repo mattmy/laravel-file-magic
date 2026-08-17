@@ -5,28 +5,59 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic\Sources;
 
 use Mattmy\FileMagic\Contracts\FileSource;
+use Mattmy\FileMagic\Contracts\SizeLimitedFileSource;
+use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\InvalidBase64;
+use Mattmy\FileMagic\Exceptions\InvalidFileSource;
 
-final readonly class Base64FileSource implements FileSource
+final class Base64FileSource implements FileSource, SizeLimitedFileSource
 {
-    private string $contents;
+    private const string ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
-    private ?string $mimeType;
+    private readonly string $encoded;
+
+    private readonly int $decodedSize;
+
+    private readonly ?string $mimeType;
+
+    private ?string $decodedContents = null;
+
+    private ?int $maximumBytes = null;
 
     /**
-     * Decode a plain Base64 string or Data URI.
+     * Parse and validate canonical Base64 without decoding its complete contents.
      */
-    public function __construct(string $base64, private ?string $originalFilename = null)
+    public function __construct(string $base64, private readonly ?string $originalFilename = null)
     {
         [$encoded, $mimeType] = $this->parse($base64);
-        $contents = \base64_decode($encoded, true);
 
-        if ($contents === false || \base64_encode($contents) !== $encoded) {
+        if (
+            \preg_match(
+                '/\A(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?\z/',
+                $encoded,
+            ) !== 1 ||
+            $this->hasNonCanonicalFinalQuantum($encoded)
+        ) {
             throw new InvalidBase64('The value is not valid canonical Base64.');
         }
 
-        $this->contents = $contents;
+        $padding = \str_ends_with($encoded, '==') ? 2 : (\str_ends_with($encoded, '=') ? 1 : 0);
+
+        $this->encoded = $encoded;
+        $this->decodedSize = \intdiv(\strlen($encoded), 4) * 3 - $padding;
         $this->mimeType = $mimeType;
+    }
+
+    /**
+     * Apply the maximum decoded byte limit before materialization.
+     */
+    public function limitSize(int $bytes): void
+    {
+        $this->maximumBytes = $bytes;
+
+        if ($this->decodedSize > $bytes) {
+            throw new FileTooLarge("The Base64 file exceeds the {$bytes} byte limit.");
+        }
     }
 
     /**
@@ -36,7 +67,21 @@ final readonly class Base64FileSource implements FileSource
      */
     public function openStream()
     {
-        return (new ContentFileSource($this->contents))->openStream();
+        if ($this->maximumBytes === null) {
+            throw new InvalidFileSource('The Base64 file size limit was not initialized.');
+        }
+
+        if ($this->decodedContents === null) {
+            $contents = \base64_decode($this->encoded, true);
+
+            if ($contents === false) {
+                throw new InvalidBase64('The value is not valid canonical Base64.');
+            }
+
+            $this->decodedContents = $contents;
+        }
+
+        return (new ContentFileSource($this->decodedContents))->openStream();
     }
 
     /**
@@ -71,5 +116,22 @@ final readonly class Base64FileSource implements FileSource
         }
 
         return [$matches[2], $matches[1]];
+    }
+
+    /**
+     * Determine whether the padded final quantum uses non-zero discarded bits.
+     */
+    private function hasNonCanonicalFinalQuantum(string $encoded): bool
+    {
+        if ($encoded === '' || \str_ends_with($encoded, '=') === false) {
+            return false;
+        }
+
+        $character = \str_ends_with($encoded, '==')
+            ? $encoded[\strlen($encoded) - 3]
+            : $encoded[\strlen($encoded) - 2];
+        $value = \strpos(self::ALPHABET, $character);
+
+        return $value === false || ($value & (\str_ends_with($encoded, '==') ? 15 : 3)) !== 0;
     }
 }

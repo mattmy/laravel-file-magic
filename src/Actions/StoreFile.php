@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Mattmy\FileMagic\Actions;
 
-use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Mattmy\FileMagic\Contracts\FileSource;
+use Mattmy\FileMagic\Contracts\SizeLimitedFileSource;
 use Mattmy\FileMagic\Data\FileMetadata;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
 use Mattmy\FileMagic\Enums\FileVisibility;
@@ -18,11 +19,13 @@ use Mattmy\FileMagic\Exceptions\FileRecordFailed;
 use Mattmy\FileMagic\Exceptions\FileRecoveryFailed;
 use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\FileWriteFailed;
+use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\PendingFile;
 use Mattmy\FileMagic\Sources\RemoteFileSource;
 use Mattmy\FileMagic\Support\ExtensionResolver;
 use Mattmy\FileMagic\Support\FileInspector;
+use Mattmy\FileMagic\Support\FileMagicConfig;
 use Mattmy\FileMagic\Support\ImageProcessor;
 use Mattmy\FileMagic\Support\OverwriteBackup;
 use Mattmy\FileMagic\Support\OverwriteBackupFactory;
@@ -38,7 +41,6 @@ final readonly class StoreFile
      * Create the file storage action.
      */
     public function __construct(
-        private Config $config,
         private FilesystemFactory $filesystems,
         private FileInspector $inspector,
         private ExtensionResolver $extensions,
@@ -46,6 +48,7 @@ final readonly class StoreFile
         private ImageProcessor $images,
         private OverwriteBackupFactory $overwriteBackups,
         private StoredFileModelResolver $models,
+        private FileMagicConfig $fileMagicConfig,
     ) {}
 
     /**
@@ -53,30 +56,48 @@ final readonly class StoreFile
      */
     public function execute(PendingFile $pending): StoredFile
     {
-        $source = $pending->source();
-        $metadata = $this->inspector->inspect($source, $this->checksumAlgorithm());
-
-        if ($pending->imageOptions() !== null) {
-            $source = $this->images->process($source, $metadata->mimeType, $pending->imageOptions());
-            $metadata = $this->inspector->inspect($source, $this->checksumAlgorithm());
-        }
-
-        $this->validate($pending, $metadata);
-
-        $diskName = $pending->disk() ?? (string) $this->config->get('file-magic.disk', 'local');
+        $configuredDisk = $pending->disk() === null;
+        $diskName = $pending->disk() ?? $this->fileMagicConfig->disk();
         $directory = $this->paths->directory(
-            $pending->directory() ?? (string) $this->config->get('file-magic.directory', 'files'),
+            $pending->directory() ?? $this->fileMagicConfig->directory(),
         );
         $filename = $this->paths->filename($pending->filename() ?? Str::ulid()->toString());
+        $visibility = $pending->fileVisibility() ?? $this->fileMagicConfig->visibility();
+        $policy = $pending->collisionPolicy() ?? $this->fileMagicConfig->collisionPolicy();
+        $maximumSize = $pending->maximumSize() ?? $this->fileMagicConfig->maximumSize();
+        $allowedMimeTypes = $pending->allowedMimeTypes() ?? $this->fileMagicConfig->allowedMimeTypes();
+        $blockedMimeTypes = $pending->blockedMimeTypes() ?? $this->fileMagicConfig->blockedMimeTypes();
+        $checksumAlgorithm = $this->fileMagicConfig->checksumAlgorithm();
+        $modelClass = $this->models->resolve();
+        $model = new $modelClass();
+        $source = $pending->source();
+        $disk = $this->resolveDisk($diskName, $configuredDisk ? 'file-magic.disk' : 'onDisk');
+
+        if ($source instanceof SizeLimitedFileSource) {
+            $source->limitSize($maximumSize);
+        }
+
+        $metadata = $this->inspector->inspect($source, $checksumAlgorithm);
+        $this->validate($pending, $metadata, $maximumSize, $allowedMimeTypes, $blockedMimeTypes);
+
+        if ($pending->imageOptions() !== null) {
+            $processedSource = $this->images->process(
+                $source,
+                $metadata->mimeType,
+                $pending->imageOptions(),
+            );
+
+            if ($processedSource !== $source) {
+                $source = $processedSource;
+                $metadata = $this->inspector->inspect($source, $checksumAlgorithm);
+                $this->validate($pending, $metadata, $maximumSize, $allowedMimeTypes, $blockedMimeTypes);
+            }
+        }
+
         $extension = $this->extensions->resolve($metadata->mimeType);
-        $visibility = $pending->fileVisibility() ?? FileVisibility::from(
-            (string) $this->config->get('file-magic.visibility', FileVisibility::Private->value),
-        );
-        $policy = $pending->collisionPolicy() ?? CollisionPolicy::from(
-            (string) $this->config->get('file-magic.collision', CollisionPolicy::Unique->value),
-        );
-        $disk = $this->filesystems->disk($diskName);
-        $path = "{$directory}/{$filename}.{$extension}";
+        $path = $directory === ''
+            ? "{$filename}.{$extension}"
+            : "{$directory}/{$filename}.{$extension}";
         $path = $this->resolveCollision($diskName, $path, $policy);
         $filename = \pathinfo($path, PATHINFO_FILENAME);
         $pathExisted = $disk->exists($path);
@@ -106,6 +127,7 @@ final readonly class StoreFile
                     $extension,
                     $visibility,
                     $policy,
+                    $model,
                 );
             } catch (Throwable $exception) {
                 $this->recoverOrDelete($disk, $path, $pathExisted, $backup, $exception);
@@ -212,11 +234,17 @@ final readonly class StoreFile
 
     /**
      * Validate file size and trusted MIME type.
+     *
+     * @param  list<string>  $allowedMimeTypes
+     * @param  list<string>  $blockedMimeTypes
      */
-    private function validate(PendingFile $pending, FileMetadata $metadata): void
-    {
-        $maximumSize = $pending->maximumSize() ?? (int) $this->config->get('file-magic.max_size', 104857600);
-
+    private function validate(
+        PendingFile $pending,
+        FileMetadata $metadata,
+        int $maximumSize,
+        array $allowedMimeTypes,
+        array $blockedMimeTypes,
+    ): void {
         if ($metadata->size > $maximumSize) {
             throw new FileTooLarge("The file exceeds the {$maximumSize} byte limit.");
         }
@@ -229,12 +257,9 @@ final readonly class StoreFile
             throw new DisallowedMimeType("The remote MIME type [{$metadata->mimeType}] is not allowed.");
         }
 
-        $allowed = $pending->allowedMimeTypes() ?? $this->stringList('file-magic.allowed_mime_types');
-        $blocked = $pending->blockedMimeTypes() ?? $this->stringList('file-magic.blocked_mime_types');
-
         if (
-            ($allowed !== [] && \in_array($metadata->mimeType, $allowed, true) === false) ||
-            \in_array($metadata->mimeType, $blocked, true)
+            ($allowedMimeTypes !== [] && \in_array($metadata->mimeType, $allowedMimeTypes, true) === false) ||
+            \in_array($metadata->mimeType, $blockedMimeTypes, true)
         ) {
             throw new DisallowedMimeType("The MIME type [{$metadata->mimeType}] is not allowed.");
         }
@@ -260,10 +285,26 @@ final readonly class StoreFile
         $directory = \pathinfo($path, PATHINFO_DIRNAME);
 
         do {
-            $uniquePath = "{$directory}/{$basename}-" . Str::lower(Str::random(12)) . ".{$extension}";
+            $uniqueName = "{$basename}-" . Str::lower(Str::random(12)) . ".{$extension}";
+            $uniquePath = $directory === '.' ? $uniqueName : "{$directory}/{$uniqueName}";
         } while ($filesystem->exists($uniquePath));
 
         return $uniquePath;
+    }
+
+    /**
+     * Resolve a configured filesystem disk before materializing the source.
+     */
+    private function resolveDisk(string $disk, string $option): Filesystem
+    {
+        try {
+            return $this->filesystems->disk($disk);
+        } catch (InvalidArgumentException $exception) {
+            throw new InvalidConfiguration(
+                "The [{$option}] value must resolve to a configured filesystem disk.",
+                previous: $exception,
+            );
+        }
     }
 
     /**
@@ -278,9 +319,8 @@ final readonly class StoreFile
         string $extension,
         FileVisibility $visibility,
         CollisionPolicy $policy,
+        StoredFile $model,
     ): StoredFile {
-        $modelClass = $this->models->resolve();
-        $model = new $modelClass();
         $locationHash = $this->locationHash($disk, $path);
 
         /** @var StoredFile|null $file */
@@ -338,31 +378,5 @@ final readonly class StoreFile
         $basename = \preg_replace('/[\x00-\x1F\x7F]/u', '', $basename);
 
         return $basename === null || $basename === '' ? null : \mb_substr($basename, 0, 255);
-    }
-
-    /**
-     * Return a validated list of string configuration values.
-     *
-     * @return list<string>
-     */
-    private function stringList(string $key): array
-    {
-        $values = $this->config->get($key, []);
-
-        if (\is_array($values) === false) {
-            return [];
-        }
-
-        return \array_values(\array_filter($values, '\is_string'));
-    }
-
-    /**
-     * Return a supported checksum algorithm.
-     */
-    private function checksumAlgorithm(): string
-    {
-        $algorithm = (string) $this->config->get('file-magic.checksum_algorithm', 'sha256');
-
-        return \in_array($algorithm, \hash_algos(), true) ? $algorithm : 'sha256';
     }
 }

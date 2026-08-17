@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Mattmy\FileMagic\Actions;
 
-use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Database\Eloquent\Collection;
 use Mattmy\FileMagic\Exceptions\FileMagicException;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
@@ -12,6 +11,7 @@ use Mattmy\FileMagic\Exceptions\ZipCreationFailed;
 use Mattmy\FileMagic\Exceptions\ZipCreationUnavailable;
 use Mattmy\FileMagic\Exceptions\ZipLimitExceeded;
 use Mattmy\FileMagic\Models\StoredFile;
+use Mattmy\FileMagic\Support\FileMagicConfig;
 use Mattmy\FileMagic\Support\ZipNameNormalizer;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
@@ -22,17 +22,13 @@ final readonly class CreateZipDownload
 {
     private const int COPY_CHUNK_BYTES = 8192;
 
-    private const int DEFAULT_MAX_FILES = 100;
-
-    private const int DEFAULT_MAX_SIZE = 1073741824;
-
     private const string TEMPORARY_FILE_PREFIX = 'file-magic-';
 
     /**
      * Create the ZIP download action.
      */
     public function __construct(
-        private Config $config,
+        private FileMagicConfig $config,
         private ZipNameNormalizer $names,
     ) {}
 
@@ -46,8 +42,8 @@ final readonly class CreateZipDownload
         $this->ensureAvailable();
         $this->ensureFilesExist($files);
 
-        $maximumFiles = $this->positiveInteger('file-magic.zip.max_files', self::DEFAULT_MAX_FILES);
-        $maximumSize = $this->positiveInteger('file-magic.zip.max_size', self::DEFAULT_MAX_SIZE);
+        $maximumFiles = $this->config->zipMaximumFiles();
+        $maximumSize = $this->config->zipMaximumSize();
 
         $this->ensureWithinMetadataLimits($files, $maximumFiles, $maximumSize);
 
@@ -130,24 +126,6 @@ final readonly class CreateZipDownload
 
             $totalSize += $file->size;
         }
-    }
-
-    /**
-     * Read and validate a positive integer configuration value.
-     */
-    private function positiveInteger(string $key, int $default): int
-    {
-        $value = $this->config->get($key, $default);
-
-        if (\is_string($value) && \ctype_digit($value)) {
-            $value = (int) $value;
-        }
-
-        if (\is_int($value) === false || $value < 1) {
-            throw new ZipCreationFailed("The [{$key}] configuration value must be a positive integer.");
-        }
-
-        return $value;
     }
 
     /**

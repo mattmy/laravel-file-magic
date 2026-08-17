@@ -8,6 +8,12 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ### Changed
 
+- Treat invalid package configuration as `InvalidConfiguration` instead of
+  coercing values or silently falling back.
+- Reject oversized Base64 input before decoding it.
+- Apply size and MIME restrictions both before and after image processing.
+- Reject non-canonical storage paths instead of trimming them or normalizing
+  separators.
 - Validate model targets against the configured model before queries or filesystem
   operations, including their connection, table, and primary key.
 - Reject unsaved owners and owners without an integer or non-empty string key.
