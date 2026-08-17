@@ -61,6 +61,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', $this->databaseConfiguration());
         $app['config']->set('filesystems.default', 'testing');
+        $app['config']->set('cache.default', 'array');
+        $app['config']->set('file-magic.collision_lock.wait_seconds', 1);
         $app['config']->set('filesystems.disks.testing', [
             'driver' => 'local',
             'root' => \sys_get_temp_dir() . '/file-magic-tests',

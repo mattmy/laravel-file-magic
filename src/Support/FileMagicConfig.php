@@ -20,6 +20,10 @@ final readonly class FileMagicConfig
 
     private const int DEFAULT_IMAGE_QUALITY = 80;
 
+    private const int DEFAULT_COLLISION_LOCK_LEASE_SECONDS = 300;
+
+    private const int DEFAULT_COLLISION_LOCK_WAIT_SECONDS = 10;
+
     private const int DEFAULT_MAXIMUM_SIZE = 104857600;
 
     private const string DEFAULT_TABLE = 'stored_files';
@@ -232,6 +236,64 @@ final readonly class FileMagicConfig
         }
 
         return CollisionPolicy::from($policy);
+    }
+
+    /**
+     * Determine whether collision locking is enabled.
+     */
+    public function collisionLockEnabled(): bool
+    {
+        $enabled = $this->config->get('file-magic.collision_lock.enabled', false);
+
+        if (\is_bool($enabled) === false) {
+            $this->invalid('file-magic.collision_lock.enabled', 'a boolean');
+        }
+
+        return $enabled;
+    }
+
+    /**
+     * Return the cache store used for collision locks.
+     */
+    public function collisionLockStore(): ?string
+    {
+        $store = $this->config->get('file-magic.collision_lock.store');
+
+        if ($store === null) {
+            return null;
+        }
+
+        if (
+            \is_string($store) === false ||
+            $store === '' ||
+            \trim($store) !== $store
+        ) {
+            $this->invalid('file-magic.collision_lock.store', 'null or a non-empty string without surrounding whitespace');
+        }
+
+        return $store;
+    }
+
+    /**
+     * Return the collision-lock lease in seconds.
+     */
+    public function collisionLockLeaseSeconds(): int
+    {
+        return $this->positiveInteger(
+            'file-magic.collision_lock.lease_seconds',
+            self::DEFAULT_COLLISION_LOCK_LEASE_SECONDS,
+        );
+    }
+
+    /**
+     * Return the collision-lock wait timeout in seconds.
+     */
+    public function collisionLockWaitSeconds(): int
+    {
+        return $this->positiveInteger(
+            'file-magic.collision_lock.wait_seconds',
+            self::DEFAULT_COLLISION_LOCK_WAIT_SECONDS,
+        );
     }
 
     /**
