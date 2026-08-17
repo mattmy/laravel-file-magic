@@ -8,12 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Mattmy\FileMagic\Actions\StoreFile;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Contracts\ReleasableFileSource;
-use Mattmy\FileMagic\Contracts\SizeLimitedFileSource;
 use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
 use Mattmy\FileMagic\Enums\FileVisibility;
+use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
 use Mattmy\FileMagic\Exceptions\InvalidFileOwner;
 use Mattmy\FileMagic\Models\StoredFile;
+use Mattmy\FileMagic\Support\FileMagicConfig;
 
 final class PendingFile
 {
@@ -58,6 +59,10 @@ final class PendingFile
      */
     public function onDisk(string $disk): self
     {
+        if ($disk === '') {
+            throw new InvalidConfiguration('The [onDisk] option must be a non-empty string.');
+        }
+
         $this->disk = $disk;
 
         return $this;
@@ -108,6 +113,10 @@ final class PendingFile
      */
     public function maxSize(int $bytes): self
     {
+        if ($bytes < 1) {
+            throw new InvalidConfiguration('The [maxSize] option must be a positive integer.');
+        }
+
         $this->maxSize = $bytes;
 
         return $this;
@@ -120,6 +129,7 @@ final class PendingFile
      */
     public function allowMimeTypes(array $mimeTypes): self
     {
+        $this->validateMimeTypes($mimeTypes, 'allowMimeTypes');
         $this->allowedMimeTypes = $mimeTypes;
 
         return $this;
@@ -132,6 +142,7 @@ final class PendingFile
      */
     public function blockMimeTypes(array $mimeTypes): self
     {
+        $this->validateMimeTypes($mimeTypes, 'blockMimeTypes');
         $this->blockedMimeTypes = $mimeTypes;
 
         return $this;
@@ -173,9 +184,10 @@ final class PendingFile
      */
     public function resizeImage(?int $maxWidth = null, ?int $quality = null): self
     {
+        $config = app(FileMagicConfig::class);
         $this->imageOptions = new ImageOptions(
-            $maxWidth ?? (int) \config('file-magic.image.max_width', 1920),
-            $quality ?? (int) \config('file-magic.image.quality', 80),
+            $maxWidth ?? $config->imageMaximumWidth(),
+            $quality ?? $config->imageQuality(),
         );
 
         return $this;
@@ -186,14 +198,8 @@ final class PendingFile
      */
     public function store(): StoredFile
     {
-        if ($this->source instanceof SizeLimitedFileSource) {
-            $this->source->limitSize(
-                $this->maxSize ?? (int) \config('file-magic.max_size', 104857600),
-            );
-        }
-
         try {
-            return \app(StoreFile::class)->execute($this);
+            return app(StoreFile::class)->execute($this);
         } finally {
             if ($this->source instanceof ReleasableFileSource) {
                 $this->source->release();
@@ -273,5 +279,23 @@ final class PendingFile
     public function imageOptions(): ?ImageOptions
     {
         return $this->imageOptions;
+    }
+
+    /**
+     * Validate one operation's MIME type list.
+     *
+     * @param  array<array-key, mixed>  $mimeTypes
+     */
+    private function validateMimeTypes(array $mimeTypes, string $option): void
+    {
+        if (\array_is_list($mimeTypes) === false) {
+            throw new InvalidConfiguration("The [{$option}] option must be a list of non-empty strings.");
+        }
+
+        foreach ($mimeTypes as $mimeType) {
+            if (\is_string($mimeType) === false || $mimeType === '') {
+                throw new InvalidConfiguration("The [{$option}] option must be a list of non-empty strings.");
+            }
+        }
     }
 }

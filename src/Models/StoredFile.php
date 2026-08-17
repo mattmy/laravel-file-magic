@@ -12,6 +12,7 @@ use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Enums\FileVisibility;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
+use Mattmy\FileMagic\Support\FileMagicConfig;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -86,7 +87,7 @@ class StoredFile extends Model
     {
         parent::__construct($attributes);
 
-        $this->setTable((string) \config('file-magic.table', 'stored_files'));
+        $this->setTable(app(FileMagicConfig::class)->table());
     }
 
     /**
@@ -144,7 +145,7 @@ class StoredFile extends Model
      */
     public function temporaryUrl(?DateTimeInterface $expiration = null): string
     {
-        $expiration ??= \now()->addMinutes((int) \config('file-magic.temporary_url_ttl', 5));
+        $expiration ??= now()->addMinutes(app(FileMagicConfig::class)->temporaryUrlTtl());
 
         return $this->storage()->temporaryUrl($this->path, $expiration);
     }
