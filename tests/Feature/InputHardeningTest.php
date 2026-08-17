@@ -300,8 +300,12 @@ it('rejects an unresolved disk before source inspection', function (): void {
 it('rejects invalid model runtime configuration', function (): void {
     config()->set('file-magic.table', '');
 
-    expect(static fn () => FileMagic::fromBase64('MTIz')->store())
-        ->toThrow(InvalidConfiguration::class);
+    try {
+        expect(static fn () => FileMagic::fromBase64('MTIz')->store())
+            ->toThrow(InvalidConfiguration::class);
+    } finally {
+        config()->set('file-magic.table', 'stored_files');
+    }
 
     Storage::disk('testing')->assertDirectoryEmpty('/');
 });
