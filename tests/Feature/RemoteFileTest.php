@@ -14,18 +14,149 @@ use Mattmy\FileMagic\Exceptions\InvalidRemoteUrl;
 use Mattmy\FileMagic\Exceptions\RemoteAccessDenied;
 use Mattmy\FileMagic\Exceptions\RemoteDownloadUnavailable;
 use Mattmy\FileMagic\Facades\FileMagic;
+use Mattmy\FileMagic\Support\RemoteUrlGuard;
 use Mattmy\FileMagic\Tests\Fixtures\FakeHostResolver;
 
 beforeEach(function (): void {
     Storage::fake('testing');
     Http::preventStrayRequests();
 
-    $this->app->instance(HostResolver::class, new FakeHostResolver([
+    $this->hostResolver = new FakeHostResolver([
         'downloads.example.com' => ['93.184.216.34'],
         'redirect.example.com' => ['93.184.216.35'],
         'private.example.com' => ['127.0.0.1'],
-        'mixed.example.com' => ['93.184.216.34', '127.0.0.1'],
+        'mixed.example.com' => ['93.184.216.34', '100.64.0.1'],
+    ]);
+    $this->app->instance(HostResolver::class, $this->hostResolver);
+});
+
+it('rejects non-global IPv4 addresses', function (string $address): void {
+    $guard = new RemoteUrlGuard(new FakeHostResolver([
+        'special.example.com' => [$address],
     ]));
+
+    expect(
+        static fn () => $guard->validate('https://special.example.com/file.txt', new RemoteFileOptions()),
+    )->toThrow(RemoteAccessDenied::class);
+
+    Http::assertNothingSent();
+})->with([
+    'shared range start' => '100.64.0.0',
+    'shared range representative' => '100.100.0.1',
+    'shared range end' => '100.127.255.255',
+    'benchmarking range start' => '198.18.0.0',
+    'benchmarking range representative' => '198.18.1.1',
+    'benchmarking range end' => '198.19.255.255',
+    'unspecified' => '0.0.0.0',
+    'loopback' => '127.0.0.1',
+    'private' => '10.0.0.1',
+    'link local' => '169.254.1.1',
+    'documentation' => '192.0.2.1',
+    'multicast' => '224.0.0.1',
+    'reserved' => '240.0.0.1',
+    'limited broadcast' => '255.255.255.255',
+]);
+
+it('allows IPv4 addresses outside the shared and benchmarking ranges', function (string $address): void {
+    $guard = new RemoteUrlGuard(new FakeHostResolver([
+        'public.example.com' => [$address],
+    ]));
+
+    $endpoint = $guard->validate('https://public.example.com/file.txt', new RemoteFileOptions());
+
+    expect($endpoint->ipAddress)->toBe($address);
+})->with([
+    'before shared range' => '100.63.255.255',
+    'after shared range' => '100.128.0.0',
+    'before benchmarking range' => '198.17.255.255',
+    'after benchmarking range' => '198.20.0.0',
+    'ordinary public address' => '93.184.216.34',
+]);
+
+it('rejects non-global IPv6 addresses including every IPv4-mapped address', function (string $address): void {
+    $guard = new RemoteUrlGuard(new FakeHostResolver([
+        'special.example.com' => [$address],
+    ]));
+
+    expect(
+        static fn () => $guard->validate('https://special.example.com/file.txt', new RemoteFileOptions()),
+    )->toThrow(RemoteAccessDenied::class);
+
+    Http::assertNothingSent();
+})->with([
+    'unspecified' => '::',
+    'loopback' => '::1',
+    'mapped loopback' => '::ffff:127.0.0.1',
+    'mapped private' => '::ffff:10.0.0.1',
+    'mapped shared' => '::ffff:100.64.0.1',
+    'mapped public' => '::ffff:8.8.8.8',
+    'unique local' => 'fc00::1',
+    'link local' => 'fe80::1',
+    'documentation' => '2001:db8::1',
+    'multicast' => 'ff00::1',
+]);
+
+it('allows ordinary public IPv6 addresses', function (): void {
+    $guard = new RemoteUrlGuard(new FakeHostResolver([
+        'public.example.com' => ['2001:4860:4860::8888'],
+    ]));
+
+    $endpoint = $guard->validate('https://public.example.com/file.txt', new RemoteFileOptions());
+
+    expect($endpoint->ipAddress)->toBe('2001:4860:4860::8888');
+});
+
+it('canonicalizes a trailing-dot hostname before resolving and pinning it', function (): void {
+    $endpoint = $this->app->make(RemoteUrlGuard::class)->validate(
+        'https://DOWNLOADS.EXAMPLE.COM.:8443/file.pdf?token=value',
+        new RemoteFileOptions(allowedPorts: [8443]),
+    );
+
+    expect($this->hostResolver->resolvedHosts)->toBe(['downloads.example.com'])
+        ->and($endpoint->url)->toBe('https://downloads.example.com:8443/file.pdf?token=value')
+        ->and($endpoint->host)->toBe('downloads.example.com')
+        ->and($endpoint->curlResolveEntry())->toBe('downloads.example.com:8443:93.184.216.34');
+});
+
+it('allows special-purpose addresses only for exact private host allowlist matches', function (): void {
+    $guard = new RemoteUrlGuard(new FakeHostResolver([
+        'private.example.com' => ['100.64.0.1'],
+        'nested.private.example.com' => ['198.18.0.1'],
+    ]));
+
+    $endpoint = $guard->validate(
+        'https://PRIVATE.EXAMPLE.COM./file.txt',
+        new RemoteFileOptions(allowedPrivateHosts: ['private.example.com']),
+    );
+
+    expect($endpoint->ipAddress)->toBe('100.64.0.1')
+        ->and(
+            static fn () => $guard->validate(
+                'https://nested.private.example.com/file.txt',
+                new RemoteFileOptions(allowedPrivateHosts: ['private.example.com']),
+            ),
+        )->toThrow(RemoteAccessDenied::class);
+});
+
+it('keeps global address policy enabled when HTTP or TLS verification is explicitly changed', function (): void {
+    $guard = new RemoteUrlGuard(new FakeHostResolver([
+        'special.example.com' => ['100.64.0.1'],
+    ]));
+
+    expect(
+        static fn () => $guard->validate(
+            'http://special.example.com/file.txt',
+            new RemoteFileOptions(allowHttp: true),
+        ),
+    )->toThrow(RemoteAccessDenied::class)
+        ->and(
+            static fn () => $guard->validate(
+                'https://special.example.com/file.txt',
+                RemoteFileOptions::withoutTlsVerification(),
+            ),
+        )->toThrow(RemoteAccessDenied::class);
+
+    Http::assertNothingSent();
 });
 
 it('keeps local sources available and reports remote downloads unavailable without curl', function (): void {
@@ -80,6 +211,20 @@ it('downloads a remote file once through the complete pending file API', functio
     );
 });
 
+it('uses the canonical trailing-dot hostname for the HTTP request', function (): void {
+    Http::fake([
+        'https://downloads.example.com/dot.txt?token=value' => Http::response('canonical'),
+    ]);
+
+    $file = FileMagic::fromUrl('https://DOWNLOADS.EXAMPLE.COM./dot.txt?token=value')->store();
+
+    expect($file->contents())->toBe('canonical')
+        ->and($this->hostResolver->resolvedHosts)->toBe(['downloads.example.com']);
+    Http::assertSent(
+        static fn (Request $request): bool => $request->url() === 'https://downloads.example.com/dot.txt?token=value',
+    );
+});
+
 it('rejects HTTP unless it is explicitly enabled', function (): void {
     Http::fake([
         'http://downloads.example.com/manual.txt' => Http::response('document'),
@@ -116,7 +261,7 @@ it('rejects private networks unless the exact host is explicitly allowed', funct
     Http::assertSentCount(1);
 });
 
-it('rejects a host when any advertised address is non-public', function (): void {
+it('rejects a host when any advertised address is non-global', function (): void {
     expect(
         static fn () => FileMagic::fromUrl('https://mixed.example.com/file.txt')->store(),
     )->toThrow(RemoteAccessDenied::class);
@@ -158,20 +303,24 @@ it('rejects HTML by default and stores it only after explicit opt in', function 
         ->and($file->contents())->toContain('<body>Hello</body>');
 });
 
-it('revalidates and follows relative redirects within the configured limit', function (): void {
+it('revalidates and canonicalizes every redirect endpoint', function (): void {
     Http::fake([
         'https://redirect.example.com/start' => Http::response(
             '',
             302,
-            ['Location' => 'https://downloads.example.com/final.txt'],
+            ['Location' => 'https://DOWNLOADS.EXAMPLE.COM./final.txt'],
         ),
         'https://downloads.example.com/final.txt' => Http::response('redirected'),
     ]);
 
-    $file = FileMagic::fromUrl('https://redirect.example.com/start')->store();
+    $file = FileMagic::fromUrl('https://REDIRECT.EXAMPLE.COM./start')->store();
 
     expect($file->contents())->toBe('redirected')
-        ->and($file->original_filename)->toBe('final.txt');
+        ->and($file->original_filename)->toBe('final.txt')
+        ->and($this->hostResolver->resolvedHosts)->toBe([
+            'redirect.example.com',
+            'downloads.example.com',
+        ]);
     Http::assertSentCount(2);
 });
 

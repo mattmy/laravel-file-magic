@@ -8,6 +8,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ### Changed
 
+- Reject non-global special-purpose IP addresses and canonicalize trailing-dot
+  hostnames before DNS resolution and cURL IP pinning for remote imports.
 - Treat invalid package configuration as `InvalidConfiguration` instead of
   coercing values or silently falling back.
 - Reject oversized Base64 input before decoding it.

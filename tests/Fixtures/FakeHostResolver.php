@@ -7,12 +7,17 @@ namespace Mattmy\FileMagic\Tests\Fixtures;
 use Mattmy\FileMagic\Contracts\HostResolver;
 use Mattmy\FileMagic\Exceptions\RemoteDownloadFailed;
 
-final readonly class FakeHostResolver implements HostResolver
+final class FakeHostResolver implements HostResolver
 {
+    /**
+     * @var list<string>
+     */
+    public array $resolvedHosts = [];
+
     /**
      * @param  array<string, non-empty-list<string>>  $addresses
      */
-    public function __construct(private array $addresses) {}
+    public function __construct(private readonly array $addresses) {}
 
     /**
      * Return deterministic addresses without performing DNS queries.
@@ -21,6 +26,8 @@ final readonly class FakeHostResolver implements HostResolver
      */
     public function resolve(string $host): array
     {
+        $this->resolvedHosts[] = $host;
+
         return $this->addresses[$host]
             ?? throw new RemoteDownloadFailed('The fake remote host could not be resolved.');
     }

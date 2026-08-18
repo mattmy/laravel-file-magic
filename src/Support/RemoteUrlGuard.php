@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Mattmy\FileMagic\Support;
 
+use GuzzleHttp\Psr7\Uri;
 use Mattmy\FileMagic\Contracts\HostResolver;
 use Mattmy\FileMagic\Data\RemoteEndpoint;
 use Mattmy\FileMagic\Data\RemoteFileOptions;
 use Mattmy\FileMagic\Exceptions\InvalidRemoteUrl;
 use Mattmy\FileMagic\Exceptions\RemoteAccessDenied;
+use Throwable;
 
 final readonly class RemoteUrlGuard
 {
@@ -26,6 +28,7 @@ final readonly class RemoteUrlGuard
         $scheme = \strtolower($this->stringPart($parts, 'scheme'));
         $host = $this->normalizeHost($this->stringPart($parts, 'host'));
         $port = $this->port($parts, $scheme);
+        $canonicalUrl = $this->canonicalizeUrl($url, $host);
 
         $this->validateScheme($scheme, $options);
         $this->validateHost($host, $options);
@@ -40,7 +43,7 @@ final readonly class RemoteUrlGuard
             }
         }
 
-        return new RemoteEndpoint($url, $host, $port, $addresses[0]);
+        return new RemoteEndpoint($canonicalUrl, $host, $port, $addresses[0]);
     }
 
     /**
@@ -95,14 +98,41 @@ final readonly class RemoteUrlGuard
     {
         $host = \strtolower(\trim($host, '[]'));
 
+        if (\filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return $host;
+        }
+
+        if (\str_ends_with($host, '.')) {
+            $host = \substr($host, 0, -1);
+        }
+
         if (
-            \filter_var($host, FILTER_VALIDATE_IP) === false &&
+            $host === '' ||
+            \str_ends_with($host, '.') ||
             \filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false
         ) {
             throw new InvalidRemoteUrl('The remote URL host is invalid.');
         }
 
-        return \rtrim($host, '.');
+        return $host;
+    }
+
+    /**
+     * Replace the request hostname with the canonical hostname used for policy and pinning.
+     */
+    private function canonicalizeUrl(string $url, string $host): string
+    {
+        try {
+            $uri = (new Uri($url))->withHost($host);
+        } catch (Throwable $exception) {
+            throw new InvalidRemoteUrl('The remote URL is invalid.', previous: $exception);
+        }
+
+        if ($uri->getHost() !== $host) {
+            throw new InvalidRemoteUrl('The remote URL host is invalid.');
+        }
+
+        return (string) $uri;
     }
 
     /**
@@ -169,10 +199,31 @@ final readonly class RemoteUrlGuard
      */
     private function isPublicAddress(string $address): bool
     {
-        return \filter_var(
-            $address,
-            FILTER_VALIDATE_IP,
-            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE,
-        ) !== false;
+        $packedAddress = \inet_pton($address);
+
+        if (
+            $packedAddress === false ||
+            \filter_var(
+                $address,
+                FILTER_VALIDATE_IP,
+                FILTER_FLAG_GLOBAL_RANGE,
+            ) === false
+        ) {
+            return false;
+        }
+
+        return $this->isMulticastAddress($packedAddress) === false;
+    }
+
+    /**
+     * Determine whether a packed IPv4 or IPv6 address is multicast.
+     */
+    private function isMulticastAddress(string $address): bool
+    {
+        $firstByte = \ord($address[0]);
+
+        return \strlen($address) === 4
+            ? $firstByte >= 224 && $firstByte <= 239
+            : $firstByte === 255;
     }
 }
