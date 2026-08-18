@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-18
+
 ### Changed
 
 - Reject non-global special-purpose IP addresses and canonicalize trailing-dot
@@ -83,6 +85,7 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 - Preservation of database records when storage state cannot be confirmed
   during deletion or consistency auditing.
 
-[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mattmy/laravel-file-magic/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/mattmy/laravel-file-magic/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mattmy/laravel-file-magic/releases/tag/v0.1.0
