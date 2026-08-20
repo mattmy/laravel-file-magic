@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Closure;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Contracts\FileSource;
@@ -58,7 +59,10 @@ it('rejects invalid store configuration before storage', function (string $key, 
 ]);
 
 it('keeps blocked MIME defaults only when the key is missing', function (): void {
-    config()->offsetUnset('file-magic.blocked_mime_types');
+    config()->set(
+        'file-magic',
+        Arr::except(config('file-magic'), ['blocked_mime_types']),
+    );
 
     expect(app(FileMagicConfig::class)->blockedMimeTypes())
         ->toBe(['application/x-httpd-php', 'application/x-php']);
