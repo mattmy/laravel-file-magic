@@ -14,6 +14,7 @@ use Mattmy\FileMagic\Exceptions\InvalidFileTarget;
 use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Tests\Fixtures\CompatibleStoredFile;
+use Mattmy\FileMagic\Tests\Fixtures\CompatibleStoredFileChild;
 use Mattmy\FileMagic\Tests\Fixtures\FailingStoredFile;
 use Mattmy\FileMagic\Tests\Fixtures\GloballyScopedStoredFile;
 use Mattmy\FileMagic\Tests\Fixtures\TrackingStoredFile;
@@ -65,6 +66,111 @@ it('accepts a persisted model of the configured compatible subclass', function (
     $file = FileMagic::fromContent('contents')->store();
 
     expect(FileMagic::find($file)->one())->toBe($file);
+});
+
+it('deduplicates same-row compatible subclasses while preserving the first model instance', function (): void {
+    $file = FileMagic::fromContent('contents')->store();
+    $child = CompatibleStoredFile::query()->findOrFail($file->getKey());
+
+    expect(FileMagic::find($file, $child)->get())
+        ->toHaveCount(1)
+        ->first()->toBe($file)
+        ->and(FileMagic::find($child, $file)->get())
+        ->toHaveCount(1)
+        ->first()->toBe($child);
+});
+
+it('deduplicates child subclasses of a configured custom model while preserving the first instance', function (): void {
+    \config()->set('file-magic.model', CompatibleStoredFile::class);
+
+    $file = FileMagic::fromContent('contents')->store();
+    $child = CompatibleStoredFileChild::query()->findOrFail($file->getKey());
+
+    expect(FileMagic::find($file, $child)->get())
+        ->toHaveCount(1)
+        ->first()->toBe($file)
+        ->and(FileMagic::find($child, $file)->get())
+        ->toHaveCount(1)
+        ->first()->toBe($child);
+});
+
+it('deduplicates compatible subclasses across IDs UUIDs and supported containers in first-target order', function (): void {
+    $file = FileMagic::fromContent('first')->store();
+    $other = FileMagic::fromContent('second')->store();
+    $child = CompatibleStoredFile::query()->findOrFail($file->getKey());
+    $queries = 0;
+
+    \DB::listen(static function () use (&$queries): void {
+        $queries++;
+    });
+
+    $files = FileMagic::find(
+        $child,
+        [$file->getKey()],
+        collect([$file->uuid, $other->getKey()]),
+        $other,
+    )->get();
+
+    expect($queries)->toBe(1)
+        ->and($files)->toHaveCount(2)
+        ->and($files->first())->toBe($child)
+        ->and($files->map(static fn (StoredFile $storedFile): int => $storedFile->getKey())->all())
+        ->toBe([$file->getKey(), $other->getKey()]);
+});
+
+it('keeps the first query result when an ID or UUID precedes a compatible subclass', function (): void {
+    $file = FileMagic::fromContent('contents')->store();
+    $child = CompatibleStoredFile::query()->findOrFail($file->getKey());
+
+    $fromId = FileMagic::find($file->getKey(), $child)->one();
+    $fromUuid = FileMagic::find($file->uuid, $child)->one();
+
+    expect($fromId)->toBeInstanceOf(StoredFile::class)
+        ->not->toBe($child)
+        ->and($fromUuid)->toBeInstanceOf(StoredFile::class)
+        ->not->toBe($child);
+});
+
+it('does not query for model-only compatible duplicates or deduplicate distinct records', function (): void {
+    $first = FileMagic::fromContent('first')->store();
+    $second = FileMagic::fromContent('second')->store();
+    $child = CompatibleStoredFile::query()->findOrFail($first->getKey());
+    $queries = 0;
+
+    \DB::listen(static function () use (&$queries): void {
+        $queries++;
+    });
+
+    $files = FileMagic::find($child, $first, $second)->get();
+
+    expect($queries)->toBe(0)
+        ->and($files)->toHaveCount(2)
+        ->and($files->all())->toBe([$child, $second]);
+});
+
+it('rejects invalid mixed model targets before querying', function (): void {
+    $file = FileMagic::fromContent('contents')->store();
+    $invalid = clone $file;
+    $queries = 0;
+
+    $invalid->setTable('other_files');
+    \DB::listen(static function () use (&$queries): void {
+        $queries++;
+    });
+
+    expect(static fn () => FileMagic::find($file, $invalid, $file->getKey())->get())
+        ->toThrow(InvalidFileTarget::class)
+        ->and($queries)->toBe(0);
+});
+
+it('deletes a same-row compatible subclass target only once', function (): void {
+    $file = FileMagic::fromContent('contents')->store();
+    $child = CompatibleStoredFile::query()->findOrFail($file->getKey());
+
+    expect(FileMagic::find($file, $child)->delete())->toBe(1);
+
+    expect(StoredFile::query()->find($file->getKey()))->toBeNull();
+    Storage::disk('testing')->assertMissing($file->path);
 });
 
 it('rejects an unsaved owner before storage begins', function (): void {
