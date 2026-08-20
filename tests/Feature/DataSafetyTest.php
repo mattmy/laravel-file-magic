@@ -60,27 +60,31 @@ it('rejects invalid model target identity before querying', function (): void {
     expect($queries)->toBe(0);
 });
 
-it('accepts a persisted model of the configured compatible subclass', function (): void {
+it('returns a configured canonical model for a compatible subclass target', function (): void {
     \config()->set('file-magic.model', CompatibleStoredFile::class);
 
     $file = FileMagic::fromContent('contents')->store();
 
-    expect(FileMagic::find($file)->one())->toBe($file);
+    expect(FileMagic::find($file)->one())
+        ->toBeInstanceOf(CompatibleStoredFile::class)
+        ->not->toBe($file)
+        ->and(FileMagic::find($file)->one()?->getKey())->toBe($file->getKey());
 });
 
-it('deduplicates same-row compatible subclasses while preserving the first model instance', function (): void {
+it('deduplicates same-row compatible subclasses into one canonical model', function (): void {
     $file = FileMagic::fromContent('contents')->store();
     $child = CompatibleStoredFile::query()->findOrFail($file->getKey());
 
     expect(FileMagic::find($file, $child)->get())
         ->toHaveCount(1)
-        ->first()->toBe($file)
+        ->first()->not->toBe($file)
+        ->and(FileMagic::find($file, $child)->one())->not->toBe($child)
         ->and(FileMagic::find($child, $file)->get())
         ->toHaveCount(1)
-        ->first()->toBe($child);
+        ->first()->not->toBe($child);
 });
 
-it('deduplicates child subclasses of a configured custom model while preserving the first instance', function (): void {
+it('deduplicates child subclasses of a configured custom model into one canonical model', function (): void {
     \config()->set('file-magic.model', CompatibleStoredFile::class);
 
     $file = FileMagic::fromContent('contents')->store();
@@ -88,10 +92,10 @@ it('deduplicates child subclasses of a configured custom model while preserving 
 
     expect(FileMagic::find($file, $child)->get())
         ->toHaveCount(1)
-        ->first()->toBe($file)
+        ->first()->not->toBe($file)
         ->and(FileMagic::find($child, $file)->get())
         ->toHaveCount(1)
-        ->first()->toBe($child);
+        ->first()->not->toBe($child);
 });
 
 it('deduplicates compatible subclasses across IDs UUIDs and supported containers in first-target order', function (): void {
@@ -113,7 +117,7 @@ it('deduplicates compatible subclasses across IDs UUIDs and supported containers
 
     expect($queries)->toBe(1)
         ->and($files)->toHaveCount(2)
-        ->and($files->first())->toBe($child)
+        ->and($files->first())->not->toBe($child)
         ->and($files->map(static fn (StoredFile $storedFile): int => $storedFile->getKey())->all())
         ->toBe([$file->getKey(), $other->getKey()]);
 });
@@ -131,7 +135,7 @@ it('keeps the first query result when an ID or UUID precedes a compatible subcla
         ->not->toBe($child);
 });
 
-it('does not query for model-only compatible duplicates or deduplicate distinct records', function (): void {
+it('queries once for model-only compatible duplicates and keeps distinct records', function (): void {
     $first = FileMagic::fromContent('first')->store();
     $second = FileMagic::fromContent('second')->store();
     $child = CompatibleStoredFile::query()->findOrFail($first->getKey());
@@ -143,9 +147,119 @@ it('does not query for model-only compatible duplicates or deduplicate distinct 
 
     $files = FileMagic::find($child, $first, $second)->get();
 
-    expect($queries)->toBe(0)
+    expect($queries)->toBe(1)
         ->and($files)->toHaveCount(2)
-        ->and($files->all())->toBe([$child, $second]);
+        ->and($files->first())->not->toBe($child)
+        ->and($files->map(static fn (StoredFile $storedFile): int => $storedFile->getKey())->all())
+        ->toBe([$first->getKey(), $second->getKey()]);
+});
+
+it('uses canonical attributes for dirty model targets when reading and deleting', function (): void {
+    $first = FileMagic::fromContent('first')->named('first')->store();
+    $second = FileMagic::fromContent('second')->named('second')->store();
+    $first->setAttribute('disk', 'other');
+    $first->setAttribute('path', $second->path);
+
+    $canonical = FileMagic::find($first)->one();
+
+    expect($canonical)
+        ->not->toBe($first)
+        ->and($canonical?->getKey())->toBe($first->getKey())
+        ->and($canonical?->path)->toBe('files/first.txt')
+        ->and($first->isDirty('path'))->toBeTrue()
+        ->and(FileMagic::find($first)->contents())->toBe('first')
+        ->and(FileMagic::find($first)->delete())->toBe(1);
+
+    expect(StoredFile::query()->find($first->getKey()))->toBeNull()
+        ->and(StoredFile::query()->find($second->getKey()))->not->toBeNull();
+    Storage::disk('testing')->assertMissing('files/first.txt');
+    Storage::disk('testing')->assertExists('files/second.txt');
+});
+
+it('uses canonical attributes for ZIP downloads from dirty model targets', function (): void {
+    if (\extension_loaded('zip') === false) {
+        $this->markTestSkipped('The PHP zip extension is not enabled.');
+    }
+
+    $first = FileMagic::fromContent('first')->named('first')->store();
+    $second = FileMagic::fromContent('second')->named('second')->store();
+    $first->setAttribute('path', $second->path);
+
+    $response = FileMagic::find($first)->downloadZip('canonical');
+    $archivePath = $response->getFile()->getPathname();
+    $archive = new \ZipArchive();
+
+    expect($archive->open($archivePath))->toBeTrue()
+        ->and($archive->getFromIndex(0))->toBe('first');
+
+    $archive->close();
+    \unlink($archivePath);
+});
+
+it('ignores fabricated clean non-key attributes on model targets', function (): void {
+    $file = FileMagic::fromContent('contents')->named('original')->store();
+    $fabricated = new StoredFile();
+
+    $fabricated->setRawAttributes([
+        'id' => $file->getKey(),
+        'disk' => 'testing',
+        'path' => 'files/arbitrary.txt',
+        'uuid' => '00000000-0000-0000-0000-000000000000',
+    ], true);
+    $fabricated->exists = true;
+
+    expect(FileMagic::find($fabricated)->one())
+        ->not->toBe($fabricated)
+        ->and(FileMagic::find($fabricated)->contents())->toBe('contents');
+    Storage::disk('testing')->assertMissing('files/arbitrary.txt');
+});
+
+it('rejects dirty primary keys before querying', function (): void {
+    $first = FileMagic::fromContent('first')->store();
+    $second = FileMagic::fromContent('second')->store();
+    $queries = 0;
+
+    $first->setAttribute($first->getKeyName(), $second->getKey());
+    \DB::listen(static function () use (&$queries): void {
+        $queries++;
+    });
+
+    expect(static fn () => FileMagic::find($first)->get())
+        ->toThrow(InvalidFileTarget::class)
+        ->and($queries)->toBe(0);
+    Storage::disk('testing')->assertExists($first->path);
+    Storage::disk('testing')->assertExists($second->path);
+});
+
+it('skips stale and scoped-out model targets', function (): void {
+    $stale = FileMagic::fromContent('stale')->store();
+    StoredFile::query()->whereKey($stale->getKey())->delete();
+
+    expect(FileMagic::find($stale)->get())->toBeEmpty();
+
+    $scoped = FileMagic::fromContent('scoped')->store();
+    $selector = new GloballyScopedStoredFile();
+
+    $selector->setRawAttributes($scoped->getAttributes(), true);
+    $selector->exists = true;
+    \config()->set('file-magic.model', GloballyScopedStoredFile::class);
+
+    expect(FileMagic::find($selector)->get())->toBeEmpty();
+});
+
+it('resolves canonical model targets once per file query', function (): void {
+    $file = FileMagic::fromContent('contents')->store();
+    $queries = 0;
+    $query = FileMagic::find($file);
+
+    \DB::listen(static function () use (&$queries): void {
+        $queries++;
+    });
+
+    $query->get();
+    $query->one();
+
+    expect($queries)->toBe(1);
 });
 
 it('rejects invalid mixed model targets before querying', function (): void {

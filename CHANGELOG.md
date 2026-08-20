@@ -10,6 +10,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 - Capture each source once into a bounded local snapshot so validation, image
   processing, and storage writes use the same bytes.
+- Resolve every non-empty model target through one scoped canonical query, so
+  caller-owned model attributes cannot direct file operations to another object.
 
 ## [0.3.0] - 2026-08-20
 

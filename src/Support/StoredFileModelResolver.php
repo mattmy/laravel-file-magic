@@ -56,6 +56,7 @@ final readonly class StoredFileModelResolver
         if (
             $target->exists === false ||
             (\is_int($key) === false && (\is_string($key) === false || $key === '')) ||
+            $target->isDirty($target->getKeyName()) ||
             $target instanceof $modelClass === false ||
             $target->getConnection()->getName() !== $configured->getConnection()->getName() ||
             $target->getTable() !== $configured->getTable() ||

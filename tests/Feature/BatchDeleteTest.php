@@ -163,7 +163,7 @@ it('uses the configured custom model for store find and batch delete', function 
     expect($file)->toBeInstanceOf(TrackingStoredFile::class)
         ->and($found)->toBeInstanceOf(TrackingStoredFile::class)
         ->and($deleted)->toBe(1)
-        ->and(TrackingStoredFile::$queriesWithoutScopes - $queriesBeforeDeletion)->toBe(1)
+        ->and(TrackingStoredFile::$queriesWithoutScopes - $queriesBeforeDeletion)->toBe(3)
         ->and(TrackingStoredFile::query()->count())->toBe(0);
 });
 
