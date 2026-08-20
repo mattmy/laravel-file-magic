@@ -19,7 +19,6 @@ use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\PendingFile;
 use Mattmy\FileMagic\Sources\ContentFileSource;
 use Mattmy\FileMagic\Support\FileMagicConfig;
-
 beforeEach(function (): void {
     Storage::fake('testing');
 });
