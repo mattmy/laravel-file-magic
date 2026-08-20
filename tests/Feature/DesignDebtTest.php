@@ -33,8 +33,13 @@ it('rejects a configured model whose table does not match package configuration 
     config()->set('file-magic.model', CompatibleStoredFile::class);
     config()->set('file-magic.table', 'custom_stored_files');
 
-    expect(static fn () => FileMagic::fromContent('contents')->store())
-        ->toThrow(InvalidStoredFileModel::class);
+    try {
+        expect(static fn () => FileMagic::fromContent('contents')->store())
+            ->toThrow(InvalidStoredFileModel::class);
+    } finally {
+        config()->set('file-magic.model', StoredFile::class);
+        config()->set('file-magic.table', 'stored_files');
+    }
 });
 
 it('forwards an explicit temporary URL expiration from a stored file', function (): void {
