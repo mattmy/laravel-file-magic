@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Closure;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -20,8 +19,6 @@ use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\PendingFile;
 use Mattmy\FileMagic\Sources\ContentFileSource;
 use Mattmy\FileMagic\Support\FileMagicConfig;
-use ReflectionProperty;
-use Throwable;
 
 beforeEach(function (): void {
     Storage::fake('testing');
