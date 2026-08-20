@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
+use Closure;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Contracts\SizeLimitedFileSource;
+use Mattmy\FileMagic\Data\RemoteFileOptions;
 use Mattmy\FileMagic\Exceptions\DisallowedMimeType;
 use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\InvalidBase64;
@@ -15,6 +18,9 @@ use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\PendingFile;
 use Mattmy\FileMagic\Sources\ContentFileSource;
+use Mattmy\FileMagic\Support\FileMagicConfig;
+use ReflectionProperty;
+use Throwable;
 
 beforeEach(function (): void {
     Storage::fake('testing');
@@ -49,6 +55,22 @@ it('rejects invalid store configuration before storage', function (string $key, 
     'floating maximum size' => ['file-magic.max_size', 100.0],
     'associative blocked MIME list' => ['file-magic.blocked_mime_types', ['mime' => 'text/plain']],
     'empty blocked MIME member' => ['file-magic.blocked_mime_types', ['']],
+]);
+
+it('keeps blocked MIME defaults only when the key is missing', function (): void {
+    config()->offsetUnset('file-magic.blocked_mime_types');
+
+    expect(app(FileMagicConfig::class)->blockedMimeTypes())
+        ->toBe(['application/x-httpd-php', 'application/x-php']);
+});
+
+it('honors explicit blocked MIME lists, including an empty opt-out', function (array $blocked): void {
+    config()->set('file-magic.blocked_mime_types', $blocked);
+
+    expect(app(FileMagicConfig::class)->blockedMimeTypes())->toBe($blocked);
+})->with([
+    'empty opt-out' => [[]],
+    'custom list' => [['text/html']],
 ]);
 
 it('limits Base64 by exact decoded bytes before materialization', function (): void {
@@ -102,44 +124,87 @@ it('lets an operation Base64 limit override the global limit', function (): void
     expect($file->contents())->toBe('123');
 });
 
-it('rejects an oversized Base64 data URI before storage', function (): void {
-    expect(static fn () => FileMagic::fromBase64('data:text/plain;base64,MTIz')->maxSize(2)->store())
+it('rejects oversized Base64 before decoding or mutating storage', function (string $base64): void {
+    $pending = FileMagic::fromBase64($base64);
+    $source = $pending->source();
+
+    expect(static fn () => $pending->maxSize(5)->store())
         ->toThrow(FileTooLarge::class);
 
+    expect(inputHardeningDecodedContents($source))->toBeNull()
+        ->and(StoredFile::query()->count())->toBe(0);
+    Storage::disk('testing')->assertDirectoryEmpty('/');
+})->with([
+    'plain Base64' => [\base64_encode('123456')],
+    'data URI' => ['data:text/plain;base64,' . \base64_encode('123456')],
+]);
+
+it('rejects invalid paths before Base64 decoding', function (Closure $configure, string $exception): void {
+    $pending = FileMagic::fromBase64(\base64_encode('contents'));
+    $source = $pending->source();
+
+    expect(static fn () => $configure($pending)->store())->toThrow($exception);
+
+    expect(inputHardeningDecodedContents($source))->toBeNull()
+        ->and(StoredFile::query()->count())->toBe(0);
+    Storage::disk('testing')->assertDirectoryEmpty('/');
+})->with([
+    'directory' => [
+        static fn (PendingFile $pending): PendingFile => $pending->inDirectory('invalid/'),
+        InvalidStoragePath::class,
+    ],
+    'filename' => [
+        static fn (PendingFile $pending): PendingFile => $pending->named('invalid/name'),
+        InvalidFileName::class,
+    ],
+]);
+
+it('rejects invalid paths before a remote request', function (Closure $configure, string $exception): void {
+    Http::preventStrayRequests();
+
+    expect(static fn () => $configure(FileMagic::fromUrl('https://downloads.example.com/file.txt'))->store())
+        ->toThrow($exception);
+
+    Http::assertNothingSent();
     expect(StoredFile::query()->count())->toBe(0);
     Storage::disk('testing')->assertDirectoryEmpty('/');
-});
+})->with([
+    'directory' => [
+        static fn (PendingFile $pending): PendingFile => $pending->inDirectory('invalid/'),
+        InvalidStoragePath::class,
+    ],
+    'filename' => [
+        static fn (PendingFile $pending): PendingFile => $pending->named('invalid/name'),
+        InvalidFileName::class,
+    ],
+]);
 
-it('rejects an oversized original image before resizing it', function (): void {
-    $contents = inputHardeningPng(width: 100, height: 100);
+it('rejects original image policy failures before image processing', function (
+    Closure $configure,
+    string $exception,
+): void {
+    $source = new InputHardeningCountingSource(inputHardeningPng(100, 100));
+    $pending = (new PendingFile($source))->resizeImage(maxWidth: 1, quality: 80);
 
-    expect(\strlen($contents))->toBeGreaterThan(1000);
+    expect(static fn () => $configure($pending)->store())->toThrow($exception);
 
-    FileMagic::fromContent($contents, 'large.png', 'image/png')
-        ->resizeImage(maxWidth: 1, quality: 80)
-        ->maxSize(1000)
-        ->store();
-})->throws(FileTooLarge::class);
-
-it('rejects a blocked original image before image processing', function (): void {
-    expect(static fn () => FileMagic::fromContent(inputHardeningPng(2, 2), 'blocked.png', 'image/png')
-        ->resizeImage(maxWidth: 1, quality: 80)
-        ->blockMimeTypes(['image/png'])
-        ->store())->toThrow(DisallowedMimeType::class);
-
-    expect(StoredFile::query()->count())->toBe(0);
+    expect($source->openedStreams)->toBe(1)
+        ->and(StoredFile::query()->count())->toBe(0);
     Storage::disk('testing')->assertDirectoryEmpty('/');
-});
-
-it('rejects an original image outside the MIME allowlist before image processing', function (): void {
-    expect(static fn () => FileMagic::fromContent(inputHardeningPng(2, 2), 'blocked.png', 'image/png')
-        ->resizeImage(maxWidth: 1, quality: 80)
-        ->allowMimeTypes(['text/plain'])
-        ->store())->toThrow(DisallowedMimeType::class);
-
-    expect(StoredFile::query()->count())->toBe(0);
-    Storage::disk('testing')->assertDirectoryEmpty('/');
-});
+})->with([
+    'oversized source' => [
+        static fn (PendingFile $pending): PendingFile => $pending->maxSize(1000),
+        FileTooLarge::class,
+    ],
+    'blocked MIME type' => [
+        static fn (PendingFile $pending): PendingFile => $pending->blockMimeTypes(['image/png']),
+        DisallowedMimeType::class,
+    ],
+    'non-allowed MIME type' => [
+        static fn (PendingFile $pending): PendingFile => $pending->allowMimeTypes(['text/plain']),
+        DisallowedMimeType::class,
+    ],
+]);
 
 it('rejects image output that grows beyond the accepted source size', function (): void {
     $contents = inputHardeningPng(1, 1);
@@ -174,15 +239,19 @@ it('rejects non-canonical storage directories before storage', function (string 
     'backslash separator' => ['nested\\directory'],
     'repeated separator' => ['nested//directory'],
     'leading whitespace' => [' nested'],
+    'trailing whitespace' => ['nested '],
+    'trailing whitespace segment' => ['nested/child '],
     'trailing separator' => ['nested/'],
     'reserved segment' => ['CON/files'],
     'delete control' => ["nested/\x7F"],
+    'C0 control' => ["nested/\x1F"],
     'invalid UTF-8' => ["nested/\xC3\x28"],
     'unsafe character' => ['nested:directory'],
     'dot segment' => ['nested/./directory'],
     'parent segment' => ['nested/../directory'],
     'leading separator' => ['/nested'],
     'null byte' => ["nested/\0directory"],
+    'reserved stem with suffix' => ['nested/CON.txt'],
     'trailing dot' => ['nested./directory'],
 ]);
 
@@ -196,8 +265,10 @@ it('rejects non-canonical storage filenames before storage', function (string $f
     'leading whitespace' => [' report'],
     'trailing whitespace' => ['report '],
     'reserved stem' => ['CON.txt'],
+    'backslash' => ['nested\\report'],
     'forward slash' => ['nested/report'],
     'delete control' => ["report\x7F"],
+    'C0 control' => ["report\x1F"],
     'invalid UTF-8' => ["report\xC3\x28"],
     'leading dot' => ['.report'],
     'null byte' => ["report\0"],
@@ -215,6 +286,15 @@ it('stores an empty directory at the disk root without a leading slash', functio
     Storage::disk('testing')->assertExists('root.txt');
 });
 
+it('preserves a canonical nested directory', function (): void {
+    $file = FileMagic::fromContent('contents')
+        ->inDirectory('accounts/42/documents')
+        ->named('report')
+        ->store();
+
+    expect($file->path)->toBe('accounts/42/documents/report.txt');
+});
+
 it('accepts a filename at the length limit and rejects one above it', function (): void {
     $file = FileMagic::fromContent('contents')->named(\str_repeat('a', 200))->store();
 
@@ -226,18 +306,21 @@ it('accepts a filename at the length limit and rejects one above it', function (
 it('rejects invalid operation options', function (Closure $operation): void {
     $operation(FileMagic::fromContent('contents'));
 })->with([
-    'empty disk' => [static fn ($pending) => $pending->onDisk('')],
-    'zero maximum size' => [static fn ($pending) => $pending->maxSize(0)],
-    'associative MIME list' => [static fn ($pending) => $pending->allowMimeTypes(['mime' => 'text/plain'])],
-    'empty MIME member' => [static fn ($pending) => $pending->blockMimeTypes([''])],
+    'empty disk' => [static fn (PendingFile $pending): PendingFile => $pending->onDisk('')],
+    'zero maximum size' => [static fn (PendingFile $pending): PendingFile => $pending->maxSize(0)],
+    'associative MIME list' => [static fn (PendingFile $pending): PendingFile => $pending->allowMimeTypes(['mime' => 'text/plain'])],
+    'empty MIME member' => [static fn (PendingFile $pending): PendingFile => $pending->blockMimeTypes([''])],
 ])->throws(InvalidConfiguration::class);
 
 it('validates image configuration only when defaults are used', function (): void {
     config()->set('file-magic.image.quality', '80');
+    config()->set('file-magic.image.max_width', '1920');
 
     expect(FileMagic::fromContent('contents')->store())->toBeInstanceOf(StoredFile::class)
         ->and(static fn () => FileMagic::fromContent('contents')->resizeImage())
-        ->toThrow(InvalidConfiguration::class);
+        ->toThrow(InvalidConfiguration::class)
+        ->and(FileMagic::fromContent('contents')->resizeImage(maxWidth: 1, quality: 80))
+        ->toBeInstanceOf(PendingFile::class);
 });
 
 it('accepts image configuration boundary values', function (): void {
@@ -253,11 +336,15 @@ it('accepts image configuration boundary values', function (): void {
         ->and($maximum?->quality)->toBe(100);
 });
 
-it('rejects invalid remote defaults before creating a pending source', function (): void {
+it('validates remote defaults only when they are used', function (): void {
     config()->set('file-magic.remote.allowed_ports', ['443']);
 
-    FileMagic::fromUrl('https://example.com/file.txt');
-})->throws(InvalidConfiguration::class);
+    expect(static fn () => FileMagic::fromUrl('https://example.com/file.txt'))
+        ->toThrow(InvalidConfiguration::class)
+        ->and(FileMagic::fromContent('contents')->store())->toBeInstanceOf(StoredFile::class)
+        ->and(FileMagic::fromUrl('https://example.com/file.txt', new RemoteFileOptions()))
+        ->toBeInstanceOf(PendingFile::class);
+});
 
 it('does not validate unused optional configuration', function (): void {
     config()->set('file-magic.remote.connect_timeout', '5');
@@ -279,6 +366,56 @@ it('accepts remote configuration boundary values', function (): void {
 
     expect(FileMagic::fromUrl('https://example.com/file.txt'))->toBeInstanceOf(PendingFile::class);
 });
+
+it('reads strict configuration reader boundaries', function (
+    string $key,
+    mixed $value,
+    Closure $read,
+    mixed $expected,
+): void {
+    config()->set($key, $value);
+
+    expect($read(app(FileMagicConfig::class)))->toBe($expected);
+})->with([
+    'disk' => ['file-magic.disk', 'archive', static fn (FileMagicConfig $config): string => $config->disk(), 'archive'],
+    'disk root directory' => ['file-magic.directory', '', static fn (FileMagicConfig $config): string => $config->directory(), ''],
+    'maximum size lower bound' => ['file-magic.max_size', 1, static fn (FileMagicConfig $config): int => $config->maximumSize(), 1],
+    'temporary URL TTL lower bound' => ['file-magic.temporary_url_ttl', 1, static fn (FileMagicConfig $config): int => $config->temporaryUrlTtl(), 1],
+    'image quality lower bound' => ['file-magic.image.quality', 1, static fn (FileMagicConfig $config): int => $config->imageQuality(), 1],
+    'image quality upper bound' => ['file-magic.image.quality', 100, static fn (FileMagicConfig $config): int => $config->imageQuality(), 100],
+    'ZIP limits lower bound' => ['file-magic.zip.max_files', 1, static fn (FileMagicConfig $config): int => $config->zipMaximumFiles(), 1],
+    'redirect lower bound' => ['file-magic.remote.max_redirects', 0, static fn (FileMagicConfig $config): int => $config->remoteMaximumRedirects(), 0],
+    'redirect upper bound' => ['file-magic.remote.max_redirects', 10, static fn (FileMagicConfig $config): int => $config->remoteMaximumRedirects(), 10],
+    'visibility enum' => ['file-magic.visibility', 'public', static fn (FileMagicConfig $config): string => $config->visibility()->value, 'public'],
+    'collision enum' => ['file-magic.collision', 'overwrite', static fn (FileMagicConfig $config): string => $config->collisionPolicy()->value, 'overwrite'],
+    'allowed MIME list' => ['file-magic.allowed_mime_types', ['text/plain'], static fn (FileMagicConfig $config): array => $config->allowedMimeTypes(), ['text/plain']],
+    'remote host list' => ['file-magic.remote.allowed_hosts', ['example.com'], static fn (FileMagicConfig $config): array => $config->remoteAllowedHosts(), ['example.com']],
+    'remote port bounds' => ['file-magic.remote.allowed_ports', [1, 65535], static fn (FileMagicConfig $config): array => $config->remoteAllowedPorts(), [1, 65535]],
+    'hash algorithm' => ['file-magic.checksum_algorithm', 'sha256', static fn (FileMagicConfig $config): string => $config->checksumAlgorithm(), 'sha256'],
+    'equal remote timeouts' => ['file-magic.remote.timeout', 5, static fn (FileMagicConfig $config): int => $config->remoteTimeout(5), 5],
+]);
+
+it('rejects invalid strict configuration reader values', function (
+    string $key,
+    mixed $value,
+    Closure $read,
+): void {
+    config()->set($key, $value);
+
+    expect(static fn () => $read(app(FileMagicConfig::class)))->toThrow(InvalidConfiguration::class);
+})->with([
+    'numeric disk' => ['file-magic.disk', 1, static fn (FileMagicConfig $config): string => $config->disk()],
+    'zero maximum size' => ['file-magic.max_size', 0, static fn (FileMagicConfig $config): int => $config->maximumSize()],
+    'float TTL' => ['file-magic.temporary_url_ttl', 1.0, static fn (FileMagicConfig $config): int => $config->temporaryUrlTtl()],
+    'boolean image width' => ['file-magic.image.max_width', true, static fn (FileMagicConfig $config): int => $config->imageMaximumWidth()],
+    'null ZIP size' => ['file-magic.zip.max_size', null, static fn (FileMagicConfig $config): int => $config->zipMaximumSize()],
+    'high image quality' => ['file-magic.image.quality', 101, static fn (FileMagicConfig $config): int => $config->imageQuality()],
+    'negative redirects' => ['file-magic.remote.max_redirects', -1, static fn (FileMagicConfig $config): int => $config->remoteMaximumRedirects()],
+    'sparse MIME list' => ['file-magic.allowed_mime_types', [1 => 'text/plain'], static fn (FileMagicConfig $config): array => $config->allowedMimeTypes()],
+    'zero remote port' => ['file-magic.remote.allowed_ports', [0], static fn (FileMagicConfig $config): array => $config->remoteAllowedPorts()],
+    'unsupported hash' => ['file-magic.checksum_algorithm', 'unsupported', static fn (FileMagicConfig $config): string => $config->checksumAlgorithm()],
+    'short remote timeout' => ['file-magic.remote.timeout', 4, static fn (FileMagicConfig $config): int => $config->remoteTimeout(5)],
+]);
 
 it('rejects invalid ZIP configuration when ZIP download is used', function (): void {
     if (\extension_loaded('zip') === false) {
@@ -320,6 +457,23 @@ it('validates the temporary URL TTL only when the default expiration is used', f
     $file->temporaryUrl();
 })->throws(InvalidConfiguration::class);
 
+it('does not read the temporary URL TTL when an expiration is explicit', function (): void {
+    config()->set('file-magic.temporary_url_ttl', '5');
+    $file = new StoredFile([
+        'disk' => 'testing',
+        'path' => 'file.txt',
+    ]);
+    $exception = null;
+
+    try {
+        $file->temporaryUrl(now()->addMinute());
+    } catch (Throwable $caught) {
+        $exception = $caught;
+    }
+
+    expect($exception)->not->toBeInstanceOf(InvalidConfiguration::class);
+});
+
 function inputHardeningPng(int $width, int $height): string
 {
     $pixels = \random_bytes($width * $height * 3);
@@ -339,6 +493,15 @@ function inputHardeningPng(int $width, int $height): string
         . inputHardeningPngChunk('IHDR', \pack('NNCCCCC', $width, $height, 8, 2, 0, 0, 0))
         . inputHardeningPngChunk('IDAT', $compressed)
         . inputHardeningPngChunk('IEND', '');
+}
+
+function inputHardeningDecodedContents(FileSource $source): ?string
+{
+    $property = new ReflectionProperty($source, 'decodedContents');
+    $decodedContents = $property->getValue($source);
+
+    /** @var ?string $decodedContents */
+    return $decodedContents;
 }
 
 function inputHardeningPngChunk(string $type, string $data): string
