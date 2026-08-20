@@ -104,7 +104,8 @@ $file = FileMagic::find($uuid)->one();
 $files = FileMagic::find([$firstId, $secondUuid])->get();
 $exists = FileMagic::find($uuid)->exists();
 $url = FileMagic::find($uuid)->url();
-$temporaryUrl = FileMagic::find($uuid)->temporaryUrl(now()->addMinutes(15));
+$temporaryUrl = FileMagic::find($uuid)->temporaryUrl();
+$customTemporaryUrl = FileMagic::find($uuid)->temporaryUrl(now()->addMinutes(15));
 $contents = FileMagic::find($uuid)->contents();
 $stream = FileMagic::find($uuid)->readStream();
 
@@ -112,6 +113,10 @@ return FileMagic::find($uuid)->download();
 ```
 
 大型檔案請使用 `readStream()`，不要使用 `contents()`；使用完畢後必須關閉回傳的 stream。
+
+## 安全性與資源限制
+
+套件設定會被嚴格驗證。Base64 輸入會在解碼前依解碼後的大小拒絕，之後以有界線的區塊解碼至暫存 stream：編碼後輸入保留於記憶體，解碼後的 bytes 使用暫存磁碟空間。儲存路徑必須事先是 canonical 形式，而圖片的大小與 MIME 政策會在處理前後都檢查。
 
 ## ZIP 下載與刪除
 

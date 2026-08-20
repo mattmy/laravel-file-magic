@@ -8,6 +8,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection as SupportCollection;
 use Mattmy\FileMagic\Actions\CreateZipDownload;
 use Mattmy\FileMagic\Actions\DeleteFiles;
+use Mattmy\FileMagic\Actions\StoreFile;
+use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Data\RemoteFileOptions;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Queries\FileFinder;
@@ -17,6 +19,7 @@ use Mattmy\FileMagic\Sources\PathFileSource;
 use Mattmy\FileMagic\Sources\RemoteFileSource;
 use Mattmy\FileMagic\Sources\UploadedFileSource;
 use Mattmy\FileMagic\Support\DocumentFactory;
+use Mattmy\FileMagic\Support\FileMagicConfig;
 use Mattmy\FileMagic\Support\RemoteDownloader;
 use Mattmy\FileMagic\Support\RemoteFileOptionsFactory;
 
@@ -32,6 +35,8 @@ final class FileMagic
         private readonly DocumentFactory $documents,
         private readonly RemoteDownloader $remoteDownloader,
         private readonly RemoteFileOptionsFactory $remoteOptions,
+        private readonly StoreFile $storeFile,
+        private readonly FileMagicConfig $config,
     ) {}
 
     /**
@@ -39,7 +44,7 @@ final class FileMagic
      */
     public function fromUpload(UploadedFile $file): PendingFile
     {
-        return new PendingFile(new UploadedFileSource($file));
+        return $this->pending(new UploadedFileSource($file));
     }
 
     /**
@@ -47,7 +52,7 @@ final class FileMagic
      */
     public function fromPath(string $path): PendingFile
     {
-        return new PendingFile(new PathFileSource($path));
+        return $this->pending(new PathFileSource($path));
     }
 
     /**
@@ -58,7 +63,7 @@ final class FileMagic
         ?string $originalFilename = null,
         ?string $mimeType = null,
     ): PendingFile {
-        return new PendingFile(new ContentFileSource($contents, $originalFilename, $mimeType));
+        return $this->pending(new ContentFileSource($contents, $originalFilename, $mimeType));
     }
 
     /**
@@ -66,7 +71,7 @@ final class FileMagic
      */
     public function fromBase64(string $base64, ?string $originalFilename = null): PendingFile
     {
-        return new PendingFile(new Base64FileSource($base64, $originalFilename));
+        return $this->pending(new Base64FileSource($base64, $originalFilename));
     }
 
     /**
@@ -74,7 +79,7 @@ final class FileMagic
      */
     public function fromUrl(string $url, ?RemoteFileOptions $options = null): PendingFile
     {
-        return new PendingFile(new RemoteFileSource(
+        return $this->pending(new RemoteFileSource(
             $url,
             $options ?? $this->remoteOptions->defaults(),
             $this->remoteDownloader,
@@ -86,7 +91,7 @@ final class FileMagic
      */
     public function text(string $text): PendingFile
     {
-        return new PendingFile($this->documents->text($text));
+        return $this->pending($this->documents->text($text));
     }
 
     /**
@@ -96,7 +101,7 @@ final class FileMagic
      */
     public function json(array|\JsonSerializable $data): PendingFile
     {
-        return new PendingFile($this->documents->json($data));
+        return $this->pending($this->documents->json($data));
     }
 
     /**
@@ -106,7 +111,7 @@ final class FileMagic
      */
     public function csv(iterable $rows): PendingFile
     {
-        return new PendingFile($this->documents->csv($rows));
+        return $this->pending($this->documents->csv($rows));
     }
 
     /**
@@ -120,7 +125,16 @@ final class FileMagic
             $this->finder,
             $this->deleteFiles,
             $this->createZipDownload,
+            $this->config,
             \array_values($targets),
         );
+    }
+
+    /**
+     * Create a pending file with the package's explicit dependencies.
+     */
+    private function pending(FileSource $source): PendingFile
+    {
+        return new PendingFile($source, $this->storeFile, $this->config);
     }
 }

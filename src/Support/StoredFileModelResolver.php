@@ -14,7 +14,10 @@ final readonly class StoredFileModelResolver
     /**
      * Create the configured StoredFile model resolver.
      */
-    public function __construct(private Config $config) {}
+    public function __construct(
+        private Config $config,
+        private FileMagicConfig $fileMagicConfig,
+    ) {}
 
     /**
      * Return the validated configured StoredFile model class.
@@ -30,6 +33,12 @@ final readonly class StoredFileModelResolver
             \is_a($modelClass, StoredFile::class, true) === false
         ) {
             throw new InvalidStoredFileModel('The configured file model must extend StoredFile.');
+        }
+
+        if ((new $modelClass())->getTable() !== $this->fileMagicConfig->table()) {
+            throw new InvalidStoredFileModel(
+                'The configured file model table must match the [file-magic.table] configuration.',
+            );
         }
 
         return $modelClass;

@@ -14,13 +14,13 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
 {
     private const string ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
+    private const int DECODE_CHUNK_BYTES = 8192;
+
     private readonly string $encoded;
 
     private readonly int $decodedSize;
 
     private readonly ?string $mimeType;
-
-    private ?string $decodedContents = null;
 
     private ?int $maximumBytes = null;
 
@@ -71,17 +71,44 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
             throw new InvalidFileSource('The Base64 file size limit was not initialized.');
         }
 
-        if ($this->decodedContents === null) {
-            $contents = \base64_decode($this->encoded, true);
+        $stream = \tmpfile();
 
-            if ($contents === false) {
+        if ($stream === false) {
+            throw new InvalidFileSource('The Base64 file could not be materialized.');
+        }
+
+        try {
+            $decodedBytes = 0;
+
+            for ($offset = 0, $length = \strlen($this->encoded); $offset < $length; $offset += self::DECODE_CHUNK_BYTES) {
+                $contents = \base64_decode(\substr($this->encoded, $offset, self::DECODE_CHUNK_BYTES), true);
+
+                if ($contents === false) {
+                    throw new InvalidBase64('The value is not valid canonical Base64.');
+                }
+
+                $this->writeAll($stream, $contents);
+                $decodedBytes += \strlen($contents);
+            }
+
+            if ($decodedBytes !== $this->decodedSize) {
                 throw new InvalidBase64('The value is not valid canonical Base64.');
             }
 
-            $this->decodedContents = $contents;
-        }
+            if (\fflush($stream) === false || \rewind($stream) === false) {
+                throw new InvalidFileSource('The Base64 file could not be materialized.');
+            }
 
-        return (new ContentFileSource($this->decodedContents))->openStream();
+            return $stream;
+        } catch (\Throwable $exception) {
+            \fclose($stream);
+
+            if ($exception instanceof InvalidBase64 || $exception instanceof InvalidFileSource) {
+                throw $exception;
+            }
+
+            throw new InvalidFileSource('The Base64 file could not be materialized.', previous: $exception);
+        }
     }
 
     /**
@@ -133,5 +160,23 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
         $value = \strpos(self::ALPHABET, $character);
 
         return $value === false || ($value & (\str_ends_with($encoded, '==') ? 15 : 3)) !== 0;
+    }
+
+    /**
+     * Write all decoded bytes to a temporary stream.
+     *
+     * @param  resource  $stream
+     */
+    private function writeAll($stream, string $contents): void
+    {
+        for ($offset = 0, $length = \strlen($contents); $offset < $length;) {
+            $written = \fwrite($stream, \substr($contents, $offset));
+
+            if ($written === false || $written === 0) {
+                throw new InvalidFileSource('The Base64 file could not be materialized.');
+            }
+
+            $offset += $written;
+        }
     }
 }

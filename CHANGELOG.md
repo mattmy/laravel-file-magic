@@ -8,6 +8,12 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ### Changed
 
+- Resolve package collaborators through constructor injection, make custom stored-file
+  models use the configured table explicitly, and require an expiration when calling
+  `StoredFile::temporaryUrl()` directly. Use `FileMagic::find(...)->temporaryUrl()` for
+  the configured default lifetime.
+- Decode Base64 sources into bounded temporary streams instead of retaining decoded content
+  in memory.
 - Deduplicate compatible stored-file subclasses by configured record identity
   when resolving `find()` targets, preserving the first supplied model instance.
 - Preserve the package blocked-MIME defaults when the configuration key is

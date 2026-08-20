@@ -52,7 +52,11 @@ final class PendingFile
     /**
      * Begin configuring storage for a file source.
      */
-    public function __construct(private readonly FileSource $source) {}
+    public function __construct(
+        private readonly FileSource $source,
+        private readonly StoreFile $storeFile,
+        private readonly FileMagicConfig $config,
+    ) {}
 
     /**
      * Select the Laravel filesystem disk.
@@ -184,10 +188,9 @@ final class PendingFile
      */
     public function resizeImage(?int $maxWidth = null, ?int $quality = null): self
     {
-        $config = app(FileMagicConfig::class);
         $this->imageOptions = new ImageOptions(
-            $maxWidth ?? $config->imageMaximumWidth(),
-            $quality ?? $config->imageQuality(),
+            $maxWidth ?? $this->config->imageMaximumWidth(),
+            $quality ?? $this->config->imageQuality(),
         );
 
         return $this;
@@ -199,7 +202,7 @@ final class PendingFile
     public function store(): StoredFile
     {
         try {
-            return app(StoreFile::class)->execute($this);
+            return $this->storeFile->execute($this);
         } finally {
             if ($this->source instanceof ReleasableFileSource) {
                 $this->source->release();

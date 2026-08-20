@@ -14,7 +14,6 @@ use Mattmy\FileMagic\Exceptions\FileWriteFailed;
 use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
 use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Models\StoredFile;
-use Mattmy\FileMagic\PendingFile;
 use Mattmy\FileMagic\Sources\ContentFileSource;
 use Mattmy\FileMagic\Support\CollisionLock;
 use Mattmy\FileMagic\Support\FileMagicConfig;
@@ -52,7 +51,7 @@ it('rejects a non-boolean collision lock switch before materializing the source'
     config()->set('file-magic.collision_lock.enabled', $enabled);
     $source = new CollisionCountingSource('contents');
 
-    expect(fn () => (new PendingFile($source))->named('never-opened')->store())
+    expect(fn () => pendingFile($source)->named('never-opened')->store())
         ->toThrow(InvalidConfiguration::class)
         ->and($source->openedStreams)->toBe(0);
 })->with([
@@ -177,7 +176,7 @@ it('fails before storage when collision lock configuration is invalid', function
     config()->set('file-magic.collision_lock.lease_seconds', 0);
     $source = new CollisionCountingSource('contents');
 
-    expect(fn () => (new PendingFile($source))->named('never-written')->store())
+    expect(fn () => pendingFile($source)->named('never-written')->store())
         ->toThrow(InvalidConfiguration::class);
 
     Storage::disk('testing')->assertMissing('files/never-written.txt');
