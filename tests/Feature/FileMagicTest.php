@@ -119,6 +119,6 @@ it('accepts variadic array collection and model targets in order', function (): 
 
     expect($files::class)->toBe(Collection::class)
         ->and($ids)->toBe([$second->id, $first->id])
-        ->and(FileMagic::find($first)->one())->toBe($first)
+        ->and(FileMagic::find($first)->one()?->getKey())->toBe($first->getKey())
         ->and(FileMagic::find([])->get()->isEmpty())->toBeTrue();
 });

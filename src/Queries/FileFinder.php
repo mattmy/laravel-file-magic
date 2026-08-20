@@ -38,7 +38,7 @@ final readonly class FileFinder
 
         foreach ($normalizedTargets as $target) {
             $file = match (true) {
-                $target instanceof StoredFile => $target,
+                $target instanceof StoredFile => $filesById->get((string) $target->getKey()),
                 \is_int($target) => $filesById->get((string) $target),
                 default => $filesByUuid->get($target),
             };
@@ -106,7 +106,7 @@ final readonly class FileFinder
     }
 
     /**
-     * Fetch unresolved ID and UUID targets in one database query.
+     * Fetch all normalized targets as canonical records in one database query.
      *
      * @param  list<int|string|StoredFile>  $targets
      * @return EloquentCollection<int, StoredFile>
@@ -119,6 +119,8 @@ final readonly class FileFinder
         foreach ($targets as $target) {
             if (\is_int($target)) {
                 $ids[] = $target;
+            } elseif ($target instanceof StoredFile) {
+                $ids[] = $target->getKey();
             } elseif (\is_string($target)) {
                 $uuids[] = $target;
             }
