@@ -6,6 +6,12 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ## [Unreleased]
 
+### Changed
+
+- Preserve the package blocked-MIME defaults when the configuration key is
+  omitted, while keeping explicit empty lists as an opt-out and invalid values
+  strict.
+
 ## [0.2.0] - 2026-08-18
 
 ### Changed

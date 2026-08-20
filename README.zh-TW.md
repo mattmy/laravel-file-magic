@@ -97,12 +97,6 @@ $image = FileMagic::fromUpload($uploadedImage)
     ->store();
 ```
 
-Collision lock 預設停用，因此儲存檔案不要求 cache store 支援 lock。將
-`collision_lock.enabled` 設為 `true` 才會依 disk 與 path 序列化寫入。啟用後，多伺服器部署
-必須共用同一個 lock backend，`array` store 只適合單一 process 測試，而且
-`collision_lock.lease_seconds` 必須長於最慢的寫入及復原操作。停用模式不保護 concurrent
-writers 的 TOCTOU 競爭；cooperative lock 的完整保證邊界請參考完整文件。
-
 ## 尋找與使用檔案
 
 ```php

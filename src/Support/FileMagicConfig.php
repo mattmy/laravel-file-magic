@@ -42,6 +42,12 @@ final readonly class FileMagicConfig
 
     private const int MINIMUM_REMOTE_PORT = 1;
 
+    /** @var list<string> */
+    private const array DEFAULT_BLOCKED_MIME_TYPES = [
+        'application/x-httpd-php',
+        'application/x-php',
+    ];
+
     /** @var non-empty-list<int> */
     private const array DEFAULT_REMOTE_PORTS = [80, 443];
 
@@ -309,7 +315,7 @@ final readonly class FileMagicConfig
      */
     public function blockedMimeTypes(): array
     {
-        return $this->stringList('file-magic.blocked_mime_types');
+        return $this->stringList('file-magic.blocked_mime_types', self::DEFAULT_BLOCKED_MIME_TYPES);
     }
 
     /**
@@ -377,11 +383,12 @@ final readonly class FileMagicConfig
     /**
      * Return a list containing only non-empty strings.
      *
+     * @param  list<string>  $default
      * @return list<string>
      */
-    private function stringList(string $key): array
+    private function stringList(string $key, array $default = []): array
     {
-        $values = $this->config->get($key, []);
+        $values = $this->config->get($key, $default);
 
         if (\is_array($values) === false || \array_is_list($values) === false) {
             $this->invalid($key, 'a list of non-empty strings');
