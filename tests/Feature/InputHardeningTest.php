@@ -247,7 +247,7 @@ it('rejects image output that grows beyond the accepted source size', function (
     Storage::disk('testing')->assertDirectoryEmpty('/');
 });
 
-it('inspects a source only once when image processing returns the same source', function (): void {
+it('captures a source once when image processing returns the same snapshot', function (): void {
     $source = new InputHardeningCountingSource('not an image');
 
     $file = pendingFile($source)
@@ -255,7 +255,7 @@ it('inspects a source only once when image processing returns the same source', 
         ->store();
 
     expect($file->contents())->toBe('not an image')
-        ->and($source->openedStreams)->toBe(2);
+        ->and($source->openedStreams)->toBe(1);
 });
 
 it('rejects non-canonical storage directories before storage', function (string $directory): void {

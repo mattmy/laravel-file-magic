@@ -6,6 +6,11 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ## [Unreleased]
 
+### Fixed
+
+- Capture each source once into a bounded local snapshot so validation, image
+  processing, and storage writes use the same bytes.
+
 ## [0.3.0] - 2026-08-20
 
 ### Changed

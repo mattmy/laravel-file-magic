@@ -79,53 +79,72 @@ final readonly class StoreFile
             $source->limitSize($maximumSize);
         }
 
-        $metadata = $this->inspector->inspect($source, $checksumAlgorithm);
-        $this->validate($pending, $metadata, $maximumSize, $allowedMimeTypes, $blockedMimeTypes);
+        $originalSnapshot = null;
+        $processedSnapshot = null;
 
-        if ($pending->imageOptions() !== null) {
-            $processedSource = $this->images->process(
+        try {
+            $originalSnapshot = $this->inspector->capture(
                 $source,
-                $metadata->mimeType,
-                $pending->imageOptions(),
+                $checksumAlgorithm,
+                $maximumSize,
             );
+            $source = $originalSnapshot;
+            $metadata = $source->metadata();
+            $this->validate($pending, $metadata, $maximumSize, $allowedMimeTypes, $blockedMimeTypes);
 
-            if ($processedSource !== $source) {
-                $source = $processedSource;
-                $metadata = $this->inspector->inspect($source, $checksumAlgorithm);
-                $this->validate($pending, $metadata, $maximumSize, $allowedMimeTypes, $blockedMimeTypes);
-            }
-        }
-
-        $extension = $this->extensions->resolve($metadata->mimeType);
-        $requestedPath = $directory === ''
-            ? "{$filename}.{$extension}"
-            : "{$directory}/{$filename}.{$extension}";
-
-        $path = $requestedPath;
-
-        while (true) {
-            $storedFile = $this->collisionLock->run(
-                $diskName,
-                $path,
-                fn (): StoredFile|false => $this->storeAtPath(
-                    $pending,
-                    $metadata,
+            if ($pending->imageOptions() !== null) {
+                $processedSource = $this->images->process(
                     $source,
-                    $disk,
+                    $metadata->mimeType,
+                    $pending->imageOptions(),
+                );
+
+                if ($processedSource !== $source) {
+                    $processedSnapshot = $this->inspector->capture(
+                        $processedSource,
+                        $checksumAlgorithm,
+                        $maximumSize,
+                    );
+                    $source = $processedSnapshot;
+                    $metadata = $source->metadata();
+                    $this->validate($pending, $metadata, $maximumSize, $allowedMimeTypes, $blockedMimeTypes);
+                }
+            }
+
+            $extension = $this->extensions->resolve($metadata->mimeType);
+            $requestedPath = $directory === ''
+                ? "{$filename}.{$extension}"
+                : "{$directory}/{$filename}.{$extension}";
+
+            $path = $requestedPath;
+
+            while (true) {
+                $storedFile = $this->collisionLock->run(
                     $diskName,
                     $path,
-                    $extension,
-                    $visibility,
-                    $policy,
-                    $model,
-                ),
-            );
+                    fn (): StoredFile|false => $this->storeAtPath(
+                        $pending,
+                        $metadata,
+                        $source,
+                        $disk,
+                        $diskName,
+                        $path,
+                        $extension,
+                        $visibility,
+                        $policy,
+                        $model,
+                    ),
+                );
 
-            if ($storedFile instanceof StoredFile) {
-                return $storedFile;
+                if ($storedFile instanceof StoredFile) {
+                    return $storedFile;
+                }
+
+                $path = $this->uniquePath($requestedPath);
             }
-
-            $path = $this->uniquePath($requestedPath);
+        } finally {
+            $processedSnapshot?->release();
+            $originalSnapshot?->release();
         }
     }
 
@@ -174,6 +193,7 @@ final readonly class StoreFile
                 return $this->createRecord(
                     $pending,
                     $metadata,
+                    $source,
                     $diskName,
                     $path,
                     \pathinfo($path, PATHINFO_FILENAME),
@@ -353,6 +373,7 @@ final readonly class StoreFile
     private function createRecord(
         PendingFile $pending,
         FileMetadata $metadata,
+        FileSource $source,
         string $disk,
         string $path,
         string $filename,
@@ -373,7 +394,7 @@ final readonly class StoreFile
             'path' => $path,
             'location_hash' => $locationHash,
             'filename' => $filename,
-            'original_filename' => $this->originalFilename($pending->source()),
+            'original_filename' => $this->originalFilename($source),
             'extension' => $extension,
             'mime_type' => $metadata->mimeType,
             'size' => $metadata->size,

@@ -8,6 +8,8 @@ use finfo;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Contracts\TrustedMimeTypeSource;
 use Mattmy\FileMagic\Data\FileMetadata;
+use Mattmy\FileMagic\Exceptions\FileMagicException;
+use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
 
 final class FileInspector
@@ -15,39 +17,110 @@ final class FileInspector
     private const int BUFFER_SIZE = 8192;
 
     /**
-     * Detect MIME type, byte size and checksum without loading the whole file.
+     * Capture, inspect and checksum a source in one bounded read.
      */
-    public function inspect(FileSource $source, string $checksumAlgorithm): FileMetadata
-    {
+    public function capture(
+        FileSource $source,
+        string $checksumAlgorithm,
+        int $maximumSize,
+    ): FileSnapshot {
+        $originalFilename = $source->originalFilename();
+        $clientMimeType = $source->clientMimeType();
+        $trustedMimeType = $source instanceof TrustedMimeTypeSource
+            ? $source->trustedMimeType()
+            : null;
         $stream = $source->openStream();
+        $path = null;
 
         try {
-            $hash = \hash_init($checksumAlgorithm);
-            $size = 0;
-            $sample = '';
+            $path = \tempnam(\sys_get_temp_dir(), 'file-magic-snapshot-');
 
-            while (\feof($stream) === false) {
-                $chunk = \fread($stream, self::BUFFER_SIZE);
-
-                if ($chunk === false) {
-                    throw new InvalidFileSource('The file stream could not be read.');
-                }
-
-                if ($sample === '') {
-                    $sample = $chunk;
-                }
-
-                $size += \strlen($chunk);
-                \hash_update($hash, $chunk);
+            if ($path === false) {
+                throw new InvalidFileSource('The file source could not be captured.');
             }
 
-            $mimeType = $source instanceof TrustedMimeTypeSource
-                ? $source->trustedMimeType()
-                : $this->detectMimeType($sample);
+            $temporary = \fopen($path, 'w+b');
 
-            return new FileMetadata($mimeType, $size, \hash_final($hash));
+            if ($temporary === false) {
+                throw new InvalidFileSource('The file source could not be captured.');
+            }
+
+            try {
+                $hash = \hash_init($checksumAlgorithm);
+                $size = 0;
+                $sample = '';
+
+                while (\feof($stream) === false) {
+                    $chunk = \fread($stream, self::BUFFER_SIZE);
+
+                    if ($chunk === false || ($chunk === '' && \feof($stream) === false)) {
+                        throw new InvalidFileSource('The file stream could not be read.');
+                    }
+
+                    $size += \strlen($chunk);
+
+                    if ($size > $maximumSize) {
+                        throw new FileTooLarge("The file exceeds the {$maximumSize} byte limit.");
+                    }
+
+                    $this->writeAll($temporary, $chunk);
+                    \hash_update($hash, $chunk);
+
+                    if ($sample === '' && $chunk !== '') {
+                        $sample = $chunk;
+                    }
+                }
+
+                if (\fflush($temporary) === false) {
+                    throw new InvalidFileSource('The file source could not be captured.');
+                }
+
+                $metadata = new FileMetadata(
+                    $trustedMimeType ?? $this->detectMimeType($sample),
+                    $size,
+                    \hash_final($hash),
+                );
+            } finally {
+                \fclose($temporary);
+            }
+
+            $snapshot = new FileSnapshot(
+                $path,
+                $metadata,
+                $originalFilename,
+                $clientMimeType,
+            );
+            $path = null;
+
+            return $snapshot;
+        } catch (FileMagicException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            throw new InvalidFileSource('The file source could not be captured.', previous: $exception);
         } finally {
             \fclose($stream);
+
+            if (\is_string($path)) {
+                @\unlink($path);
+            }
+        }
+    }
+
+    /**
+     * Write a complete chunk to the snapshot stream.
+     *
+     * @param  resource  $stream
+     */
+    private function writeAll($stream, string $contents): void
+    {
+        for ($offset = 0, $length = \strlen($contents); $offset < $length;) {
+            $written = \fwrite($stream, \substr($contents, $offset));
+
+            if ($written === false || $written === 0) {
+                throw new InvalidFileSource('The file source could not be captured.');
+            }
+
+            $offset += $written;
         }
     }
 
