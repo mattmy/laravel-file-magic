@@ -17,6 +17,13 @@ final class ScopedStoredFile extends StoredFile
     protected $connection = 'audit';
 
     /**
+     * The custom database table.
+     *
+     * @var string
+     */
+    protected $table = 'audit_stored_files';
+
+    /**
      * The custom primary key.
      *
      * @var string

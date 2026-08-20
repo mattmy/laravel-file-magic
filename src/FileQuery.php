@@ -12,6 +12,7 @@ use Mattmy\FileMagic\Actions\DeleteFiles;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Queries\FileFinder;
+use Mattmy\FileMagic\Support\FileMagicConfig;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -31,6 +32,7 @@ final class FileQuery
         private readonly FileFinder $finder,
         private readonly DeleteFiles $deleteFiles,
         private readonly CreateZipDownload $createZipDownload,
+        private readonly FileMagicConfig $config,
         private readonly array $targets,
     ) {}
 
@@ -88,7 +90,10 @@ final class FileQuery
      */
     public function temporaryUrl(?DateTimeInterface $expiration = null): string
     {
-        return $this->requiredFile()->temporaryUrl($expiration);
+        $file = $this->requiredFile();
+        $expiration ??= now()->addMinutes($this->config->temporaryUrlTtl());
+
+        return $file->temporaryUrl($expiration);
     }
 
     /**

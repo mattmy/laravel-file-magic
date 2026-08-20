@@ -104,7 +104,8 @@ $file = FileMagic::find($uuid)->one();
 $files = FileMagic::find([$firstId, $secondUuid])->get();
 $exists = FileMagic::find($uuid)->exists();
 $url = FileMagic::find($uuid)->url();
-$temporaryUrl = FileMagic::find($uuid)->temporaryUrl(now()->addMinutes(15));
+$temporaryUrl = FileMagic::find($uuid)->temporaryUrl();
+$customTemporaryUrl = FileMagic::find($uuid)->temporaryUrl(now()->addMinutes(15));
 $contents = FileMagic::find($uuid)->contents();
 $stream = FileMagic::find($uuid)->readStream();
 
@@ -113,6 +114,13 @@ return FileMagic::find($uuid)->download();
 
 Use `readStream()` instead of `contents()` for large files, and close the returned stream
 when finished.
+
+## Safety and resource limits
+
+Package configuration is validated strictly. Base64 inputs are rejected from their decoded
+size before decoding, then decoded in bounded chunks into a temporary stream: the encoded input
+remains in memory, while decoded bytes use temporary disk space. Storage paths must already be
+canonical, and image size and MIME policies are checked before and after image processing.
 
 ## ZIP downloads and deletion
 

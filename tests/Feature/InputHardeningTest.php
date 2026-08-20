@@ -9,6 +9,7 @@ use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Contracts\SizeLimitedFileSource;
 use Mattmy\FileMagic\Data\RemoteFileOptions;
 use Mattmy\FileMagic\Exceptions\DisallowedMimeType;
+use Mattmy\FileMagic\Exceptions\FileNotFound;
 use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\InvalidBase64;
 use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
@@ -17,6 +18,7 @@ use Mattmy\FileMagic\Exceptions\InvalidStoragePath;
 use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\PendingFile;
+use Mattmy\FileMagic\Sources\Base64FileSource;
 use Mattmy\FileMagic\Sources\ContentFileSource;
 use Mattmy\FileMagic\Support\FileMagicConfig;
 
@@ -107,6 +109,32 @@ it('stores canonical plain and data URI Base64 values', function (string $value,
     'data URI with two padding' => ['data:text/plain;base64,MQ==', '1'],
 ]);
 
+it('decodes Base64 into independent rewound temporary streams across chunk boundaries', function (): void {
+    $contents = \random_bytes(16385);
+    $source = new Base64FileSource(\base64_encode($contents));
+    $source->limitSize(\strlen($contents));
+    $first = $source->openStream();
+    $second = $source->openStream();
+
+    try {
+        expect(\ftell($first))->toBe(0)
+            ->and(\ftell($second))->toBe(0)
+            ->and(\fread($first, 8193))->toBe(\substr($contents, 0, 8193));
+
+        \fclose($first);
+
+        expect(\stream_get_contents($second))->toBe($contents);
+    } finally {
+        if (\is_resource($first)) {
+            \fclose($first);
+        }
+
+        if (\is_resource($second)) {
+            \fclose($second);
+        }
+    }
+});
+
 it('rejects non-canonical Base64 during source creation', function (string $value): void {
     FileMagic::fromBase64($value);
 })->with([
@@ -132,7 +160,7 @@ it('rejects oversized Base64 before decoding or mutating storage', function (str
     expect(static fn () => $pending->maxSize(5)->store())
         ->toThrow(FileTooLarge::class);
 
-    expect(inputHardeningDecodedContents($source))->toBeNull()
+    expect(inputHardeningHasDecodedCache($source))->toBeFalse()
         ->and(StoredFile::query()->count())->toBe(0);
     Storage::disk('testing')->assertDirectoryEmpty('/');
 })->with([
@@ -146,7 +174,7 @@ it('rejects invalid paths before Base64 decoding', function (Closure $configure,
 
     expect(static fn () => $configure($pending)->store())->toThrow($exception);
 
-    expect(inputHardeningDecodedContents($source))->toBeNull()
+    expect(inputHardeningHasDecodedCache($source))->toBeFalse()
         ->and(StoredFile::query()->count())->toBe(0);
     Storage::disk('testing')->assertDirectoryEmpty('/');
 })->with([
@@ -185,7 +213,7 @@ it('rejects original image policy failures before image processing', function (
     string $exception,
 ): void {
     $source = new InputHardeningCountingSource(inputHardeningPng(100, 100));
-    $pending = (new PendingFile($source))->resizeImage(maxWidth: 1, quality: 80);
+    $pending = pendingFile($source)->resizeImage(maxWidth: 1, quality: 80);
 
     expect(static fn () => $configure($pending)->store())->toThrow($exception);
 
@@ -222,7 +250,7 @@ it('rejects image output that grows beyond the accepted source size', function (
 it('inspects a source only once when image processing returns the same source', function (): void {
     $source = new InputHardeningCountingSource('not an image');
 
-    $file = (new PendingFile($source))
+    $file = pendingFile($source)
         ->resizeImage(maxWidth: 1, quality: 80)
         ->store();
 
@@ -321,6 +349,19 @@ it('validates image configuration only when defaults are used', function (): voi
         ->and(static fn () => FileMagic::fromContent('contents')->resizeImage())
         ->toThrow(InvalidConfiguration::class)
         ->and(FileMagic::fromContent('contents')->resizeImage(maxWidth: 1, quality: 80))
+        ->toBeInstanceOf(PendingFile::class);
+});
+
+it('reads only the missing image defaults', function (): void {
+    config()->set('file-magic.image.max_width', '1920');
+
+    expect(FileMagic::fromContent('contents')->resizeImage(maxWidth: 1))
+        ->toBeInstanceOf(PendingFile::class);
+
+    config()->set('file-magic.image.max_width', 1920);
+    config()->set('file-magic.image.quality', '80');
+
+    expect(FileMagic::fromContent('contents')->resizeImage(quality: 80))
         ->toBeInstanceOf(PendingFile::class);
 });
 
@@ -448,31 +489,31 @@ it('rejects invalid model runtime configuration', function (): void {
     Storage::disk('testing')->assertDirectoryEmpty('/');
 });
 
-it('validates the temporary URL TTL only when the default expiration is used', function (): void {
+it('validates the temporary URL TTL only when FileQuery uses the default expiration', function (): void {
     config()->set('file-magic.temporary_url_ttl', '5');
-    $file = new StoredFile([
-        'disk' => 'testing',
-        'path' => 'file.txt',
-    ]);
+    $file = FileMagic::fromContent('contents')->store();
 
-    $file->temporaryUrl();
+    FileMagic::find($file)->temporaryUrl();
 })->throws(InvalidConfiguration::class);
 
 it('does not read the temporary URL TTL when an expiration is explicit', function (): void {
     config()->set('file-magic.temporary_url_ttl', '5');
-    $file = new StoredFile([
-        'disk' => 'testing',
-        'path' => 'file.txt',
-    ]);
+    $file = FileMagic::fromContent('contents')->store();
     $exception = null;
 
     try {
-        $file->temporaryUrl(now()->addMinute());
+        FileMagic::find($file)->temporaryUrl(now()->addMinute());
     } catch (Throwable $caught) {
         $exception = $caught;
     }
 
     expect($exception)->not->toBeInstanceOf(InvalidConfiguration::class);
+});
+
+it('resolves a required file before reading the default temporary URL TTL', function (): void {
+    config()->set('file-magic.temporary_url_ttl', '5');
+
+    expect(static fn () => FileMagic::find()->temporaryUrl())->toThrow(FileNotFound::class);
 });
 
 function inputHardeningPng(int $width, int $height): string
@@ -496,13 +537,9 @@ function inputHardeningPng(int $width, int $height): string
         . inputHardeningPngChunk('IEND', '');
 }
 
-function inputHardeningDecodedContents(FileSource $source): ?string
+function inputHardeningHasDecodedCache(FileSource $source): bool
 {
-    $property = new ReflectionProperty($source, 'decodedContents');
-    $decodedContents = $property->getValue($source);
-
-    /** @var ?string $decodedContents */
-    return $decodedContents;
+    return (new ReflectionClass($source))->hasProperty('decodedContents');
 }
 
 function inputHardeningPngChunk(string $type, string $data): string
