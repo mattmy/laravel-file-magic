@@ -6,6 +6,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-20
+
 ### Changed
 
 - Resolve package collaborators through constructor injection, make custom stored-file
