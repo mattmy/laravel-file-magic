@@ -8,6 +8,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ### Changed
 
+- Deduplicate compatible stored-file subclasses by configured record identity
+  when resolving `find()` targets, preserving the first supplied model instance.
 - Preserve the package blocked-MIME defaults when the configuration key is
   omitted, while keeping explicit empty lists as an opt-out and invalid values
   strict.

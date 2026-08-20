@@ -47,7 +47,7 @@ final readonly class FileFinder
                 continue;
             }
 
-            $key = $file->getMorphClass() . '|' . (string) $file->getKey();
+            $key = (string) $file->getKey();
 
             if (\array_key_exists($key, $resolvedKeys)) {
                 continue;
