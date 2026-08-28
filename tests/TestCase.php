@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic\Tests;
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Foundation\Application;
+use Illuminate\Testing\PendingCommand;
 use Mattmy\FileMagic\FileMagicServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Override;
 use RuntimeException;
 
 abstract class TestCase extends Orchestra
@@ -16,6 +19,7 @@ abstract class TestCase extends Orchestra
     /**
      * Run the publishable package migration for each isolated test.
      */
+    #[Override]
     protected function setUp(): void
     {
         parent::setUp();
@@ -27,25 +31,53 @@ abstract class TestCase extends Orchestra
         }
 
         $this->migration = $migration;
+        // Laravel migration lifecycle methods are defined by concrete migration classes.
+        // @phpstan-ignore method.notFound
         $this->migration->up();
     }
 
     /**
      * Roll back the publishable package migration after each isolated test.
      */
+    #[Override]
     protected function tearDown(): void
     {
+        // Laravel migration lifecycle methods are defined by concrete migration classes.
+        // @phpstan-ignore method.notFound
         $this->migration->down();
 
         parent::tearDown();
     }
 
     /**
+     * Return the mocked console command used by this package's feature tests.
+     *
+     * @param  array<array-key, mixed>  $parameters
+     */
+    #[Override]
+    public function artisan($command, $parameters = []): PendingCommand
+    {
+        $pendingCommand = parent::artisan($command, $parameters);
+
+        \assert($pendingCommand instanceof PendingCommand);
+
+        return $pendingCommand;
+    }
+
+    protected function application(): Application
+    {
+        \assert($this->app instanceof Application);
+
+        return $this->app;
+    }
+
+    /**
      * Register the package service provider.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param  Application  $app
      * @return list<class-string>
      */
+    #[Override]
     protected function getPackageProviders($app): array
     {
         return [FileMagicServiceProvider::class];
@@ -54,8 +86,9 @@ abstract class TestCase extends Orchestra
     /**
      * Configure the isolated Laravel application.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param  Application  $app
      */
+    #[Override]
     protected function defineEnvironment($app): void
     {
         $app['config']->set('database.default', 'testing');

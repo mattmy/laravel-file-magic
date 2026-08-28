@@ -7,6 +7,7 @@ namespace Mattmy\FileMagic\Support;
 use GuzzleHttp\Psr7\StreamDecoratorTrait;
 use GuzzleHttp\Psr7\Utils;
 use Mattmy\FileMagic\Exceptions\FileTooLarge;
+use Override;
 use Psr\Http\Message\StreamInterface;
 
 final class LimitedWriteStream implements StreamInterface
@@ -28,6 +29,7 @@ final class LimitedWriteStream implements StreamInterface
     /**
      * Write bytes unless doing so would exceed the configured limit.
      */
+    #[Override]
     public function write(string $string): int
     {
         $bytes = \strlen($string);

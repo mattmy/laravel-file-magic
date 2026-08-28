@@ -48,7 +48,7 @@ it('rejects invalid model target identity before querying', function (): void {
     $wrongConnection->setConnection('other');
     $missingKey->setAttribute($missingKey->getKeyName(), null);
     \config()->set('database.connections.other', \config('database.connections.testing'));
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -75,13 +75,13 @@ it('deduplicates same-row compatible subclasses into one canonical model', funct
     $file = FileMagic::fromContent('contents')->store();
     $child = CompatibleStoredFile::query()->findOrFail($file->getKey());
 
-    expect(FileMagic::find($file, $child)->get())
-        ->toHaveCount(1)
-        ->first()->not->toBe($file)
+    $files = FileMagic::find($file, $child)->get();
+
+    expect($files)->toHaveCount(1)
+        ->and($files->first())->not->toBe($file)
         ->and(FileMagic::find($file, $child)->one())->not->toBe($child)
-        ->and(FileMagic::find($child, $file)->get())
-        ->toHaveCount(1)
-        ->first()->not->toBe($child);
+        ->and(FileMagic::find($child, $file)->get()->count())->toBe(1)
+        ->and(FileMagic::find($child, $file)->get()->first())->not->toBe($child);
 });
 
 it('deduplicates child subclasses of a configured custom model into one canonical model', function (): void {
@@ -90,12 +90,13 @@ it('deduplicates child subclasses of a configured custom model into one canonica
     $file = FileMagic::fromContent('contents')->store();
     $child = CompatibleStoredFileChild::query()->findOrFail($file->getKey());
 
-    expect(FileMagic::find($file, $child)->get())
-        ->toHaveCount(1)
-        ->first()->not->toBe($file)
-        ->and(FileMagic::find($child, $file)->get())
-        ->toHaveCount(1)
-        ->first()->not->toBe($child);
+    $files = FileMagic::find($file, $child)->get();
+    $reversedFiles = FileMagic::find($child, $file)->get();
+
+    expect($files)->toHaveCount(1)
+        ->and($files->first())->not->toBe($file)
+        ->and($reversedFiles)->toHaveCount(1)
+        ->and($reversedFiles->first())->not->toBe($child);
 });
 
 it('deduplicates compatible subclasses across IDs UUIDs and supported containers in first-target order', function (): void {
@@ -104,29 +105,29 @@ it('deduplicates compatible subclasses across IDs UUIDs and supported containers
     $child = CompatibleStoredFile::query()->findOrFail($file->getKey());
     $queries = 0;
 
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
     $files = FileMagic::find(
         $child,
-        [$file->getKey()],
-        collect([$file->uuid, $other->getKey()]),
+        [storedFileKey($file)],
+        collect([$file->uuid, storedFileKey($other)]),
         $other,
     )->get();
 
     expect($queries)->toBe(1)
         ->and($files)->toHaveCount(2)
         ->and($files->first())->not->toBe($child)
-        ->and($files->map(static fn (StoredFile $storedFile): int => $storedFile->getKey())->all())
-        ->toBe([$file->getKey(), $other->getKey()]);
+        ->and($files->map(static fn (StoredFile $storedFile): int => storedFileKey($storedFile))->all())
+        ->toBe([storedFileKey($file), storedFileKey($other)]);
 });
 
 it('keeps the first query result when an ID or UUID precedes a compatible subclass', function (): void {
     $file = FileMagic::fromContent('contents')->store();
     $child = CompatibleStoredFile::query()->findOrFail($file->getKey());
 
-    $fromId = FileMagic::find($file->getKey(), $child)->one();
+    $fromId = FileMagic::find(storedFileKey($file), $child)->one();
     $fromUuid = FileMagic::find($file->uuid, $child)->one();
 
     expect($fromId)->toBeInstanceOf(StoredFile::class)
@@ -141,7 +142,7 @@ it('queries once for model-only compatible duplicates and keeps distinct records
     $child = CompatibleStoredFile::query()->findOrFail($first->getKey());
     $queries = 0;
 
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -150,8 +151,8 @@ it('queries once for model-only compatible duplicates and keeps distinct records
     expect($queries)->toBe(1)
         ->and($files)->toHaveCount(2)
         ->and($files->first())->not->toBe($child)
-        ->and($files->map(static fn (StoredFile $storedFile): int => $storedFile->getKey())->all())
-        ->toBe([$first->getKey(), $second->getKey()]);
+        ->and($files->map(static fn (StoredFile $storedFile): int => storedFileKey($storedFile))->all())
+        ->toBe([storedFileKey($first), storedFileKey($second)]);
 });
 
 it('uses canonical attributes for dirty model targets when reading and deleting', function (): void {
@@ -187,13 +188,13 @@ it('uses canonical attributes for ZIP downloads from dirty model targets', funct
 
     $response = FileMagic::find($first)->downloadZip('canonical');
     $archivePath = $response->getFile()->getPathname();
-    $archive = new \ZipArchive();
+    $archive = new ZipArchive();
 
     expect($archive->open($archivePath))->toBeTrue()
         ->and($archive->getFromIndex(0))->toBe('first');
 
     $archive->close();
-    \unlink($archivePath);
+    (new Illuminate\Filesystem\Filesystem())->delete($archivePath);
 });
 
 it('ignores fabricated clean non-key attributes on model targets', function (): void {
@@ -220,7 +221,7 @@ it('rejects dirty primary keys before querying', function (): void {
     $queries = 0;
 
     $first->setAttribute($first->getKeyName(), $second->getKey());
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -252,7 +253,7 @@ it('resolves canonical model targets once per file query', function (): void {
     $queries = 0;
     $query = FileMagic::find($file);
 
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -268,11 +269,11 @@ it('rejects invalid mixed model targets before querying', function (): void {
     $queries = 0;
 
     $invalid->setTable('other_files');
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
-    expect(static fn () => FileMagic::find($file, $invalid, $file->getKey())->get())
+    expect(static fn () => FileMagic::find($file, $invalid, storedFileKey($file))->get())
         ->toThrow(InvalidFileTarget::class)
         ->and($queries)->toBe(0);
 });
@@ -301,10 +302,10 @@ it('rejects an unsaved owner before storage begins', function (): void {
 });
 
 it('preserves record and cleanup failures when a newly written object cannot be deleted', function (): void {
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     \config()->set('file-magic.model', FailingStoredFile::class);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/new.txt')->andReturnFalse();
@@ -314,37 +315,37 @@ it('preserves record and cleanup failures when a newly written object cannot be 
     try {
         FileMagic::fromContent('contents')->named('new')->store();
     } catch (FileRecoveryFailed $exception) {
-        expect($exception->operationFailure())->toBeInstanceOf(\RuntimeException::class)
+        expect($exception->operationFailure())->toBeInstanceOf(RuntimeException::class)
             ->and($exception->getPrevious())->toBeInstanceOf(FileWriteFailed::class);
 
         return;
     }
 
-    throw new \RuntimeException('The cleanup failure was not thrown.');
+    throw new RuntimeException('The cleanup failure was not thrown.');
 });
 
 it('preserves record and cleanup failures when deleting a newly written object throws', function (): void {
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     \config()->set('file-magic.model', FailingStoredFile::class);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/new.txt')->andReturnFalse();
     $filesystem->shouldReceive('put')->once()->andReturnTrue();
     $filesystem->shouldReceive('delete')->once()->with('files/new.txt')
-        ->andThrow(new \RuntimeException('Simulated cleanup failure.'));
+        ->andThrow(new RuntimeException('Simulated cleanup failure.'));
 
     try {
         FileMagic::fromContent('contents')->named('new')->store();
     } catch (FileRecoveryFailed $exception) {
-        expect($exception->operationFailure())->toBeInstanceOf(\RuntimeException::class)
+        expect($exception->operationFailure())->toBeInstanceOf(RuntimeException::class)
             ->and($exception->getPrevious()?->getMessage())->toBe('Simulated cleanup failure.');
 
         return;
     }
 
-    throw new \RuntimeException('The cleanup failure was not thrown.');
+    throw new RuntimeException('The cleanup failure was not thrown.');
 });
 
 it('updates the existing overwrite record when its global scope hides it', function (): void {

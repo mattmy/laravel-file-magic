@@ -38,7 +38,7 @@ it('restores original content visibility and record when overwrite persistence f
             ->withMetadata(['version' => 'new'])
             ->onCollision(CollisionPolicy::Overwrite)
             ->store();
-    } catch (\Throwable $exception) {
+    } catch (Throwable $exception) {
         expect($exception)->toBeInstanceOf(FileRecordFailed::class);
     }
 
@@ -57,11 +57,11 @@ it('restores original content visibility and record when overwrite persistence f
 });
 
 it('restores an existing object when overwrite storage returns false', function (): void {
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
     $restoredContents = null;
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('private');
@@ -98,10 +98,10 @@ it('restores an existing object when overwrite storage returns false', function 
 })->throws(FileWriteFailed::class);
 
 it('does not start overwrite when the original visibility cannot be backed up', function (): void {
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('unsupported');
@@ -116,10 +116,10 @@ it('does not start overwrite when the original visibility cannot be backed up', 
 })->throws(FileWriteFailed::class);
 
 it('preserves operation and recovery failures when overwrite restoration fails', function (): void {
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('private');
@@ -129,11 +129,11 @@ it('preserves operation and recovery failures when overwrite restoration fails',
     $filesystem->shouldReceive('put')
         ->once()
         ->ordered()
-        ->andThrow(new \RuntimeException('Simulated overwrite failure.'));
+        ->andThrow(new RuntimeException('Simulated overwrite failure.'));
     $filesystem->shouldReceive('put')
         ->once()
         ->ordered()
-        ->andThrow(new \RuntimeException('Simulated recovery failure.'));
+        ->andThrow(new RuntimeException('Simulated recovery failure.'));
 
     try {
         \app(FileMagic::class)
@@ -142,15 +142,15 @@ it('preserves operation and recovery failures when overwrite restoration fails',
             ->onCollision(CollisionPolicy::Overwrite)
             ->store();
     } catch (FileRecoveryFailed $exception) {
-        expect($exception->operationFailure())->toBeInstanceOf(\RuntimeException::class)
-            ->and($exception->getPrevious())->toBeInstanceOf(\RuntimeException::class)
+        expect($exception->operationFailure())->toBeInstanceOf(RuntimeException::class)
+            ->and($exception->getPrevious())->toBeInstanceOf(RuntimeException::class)
             ->and($exception->operationFailure()->getMessage())->toBe('Simulated overwrite failure.')
             ->and($exception->getPrevious()?->getMessage())->toBe('Simulated recovery failure.');
 
         return;
     }
 
-    throw new \RuntimeException('The overwrite recovery failure was not thrown.');
+    throw new RuntimeException('The overwrite recovery failure was not thrown.');
 });
 
 /**
@@ -163,7 +163,7 @@ function streamContaining(string $contents)
     $stream = \tmpfile();
 
     if ($stream === false || \fwrite($stream, $contents) !== \strlen($contents) || \rewind($stream) === false) {
-        throw new \RuntimeException('The test stream could not be created.');
+        throw new RuntimeException('The test stream could not be created.');
     }
 
     return $stream;

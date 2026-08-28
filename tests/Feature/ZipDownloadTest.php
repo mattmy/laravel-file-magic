@@ -8,7 +8,6 @@ use Mattmy\FileMagic\Exceptions\InvalidFileName;
 use Mattmy\FileMagic\Exceptions\ZipCreationUnavailable;
 use Mattmy\FileMagic\Exceptions\ZipLimitExceeded;
 use Mattmy\FileMagic\Facades\FileMagic;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 beforeEach(function (): void {
     Storage::fake('testing');
@@ -30,11 +29,9 @@ it('downloads resolved files as a named ZIP in query order', function (): void {
 
     $response = FileMagic::find([$second->uuid, $first->id])->downloadZip('project-files');
     $archivePath = $response->getFile()->getPathname();
-    $archive = new \ZipArchive();
+    $archive = new ZipArchive();
 
-    expect($response)
-        ->toBeInstanceOf(BinaryFileResponse::class)
-        ->and($response->headers->get('Content-Type'))->toBe('application/zip')
+    expect($response->headers->get('Content-Type'))->toBe('application/zip')
         ->and($response->headers->get('Content-Disposition'))
         ->toContain('project-files.zip')
         ->and($archive->open($archivePath))->toBeTrue()
@@ -89,7 +86,7 @@ it('removes source paths from archive entry names', function (): void {
     $file->forceFill(['original_filename' => '../../private/document.txt'])->save();
     $response = FileMagic::find($file)->downloadZip('safe-entries');
     $archivePath = $response->getFile()->getPathname();
-    $archive = new \ZipArchive();
+    $archive = new ZipArchive();
 
     expect($archive->open($archivePath))->toBeTrue()
         ->and($archive->numFiles)->toBe(1)

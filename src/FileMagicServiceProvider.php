@@ -8,12 +8,14 @@ use Illuminate\Support\ServiceProvider;
 use Mattmy\FileMagic\Commands\AuditFilesCommand;
 use Mattmy\FileMagic\Contracts\HostResolver;
 use Mattmy\FileMagic\Support\NativeHostResolver;
+use Override;
 
 final class FileMagicServiceProvider extends ServiceProvider
 {
     /**
      * Register package services and configuration.
      */
+    #[Override]
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/file-magic.php', 'file-magic');

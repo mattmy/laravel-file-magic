@@ -6,6 +6,7 @@ namespace Mattmy\FileMagic\Support;
 
 use Mattmy\FileMagic\Contracts\HostResolver;
 use Mattmy\FileMagic\Exceptions\RemoteDownloadFailed;
+use Override;
 
 final class NativeHostResolver implements HostResolver
 {
@@ -14,6 +15,7 @@ final class NativeHostResolver implements HostResolver
      *
      * @return non-empty-list<string>
      */
+    #[Override]
     public function resolve(string $host): array
     {
         if (\filter_var($host, FILTER_VALIDATE_IP) !== false) {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic\Sources;
 
 use Mattmy\FileMagic\Contracts\TrustedMimeTypeSource;
+use Override;
 
 final readonly class GeneratedDocumentSource implements TrustedMimeTypeSource
 {
@@ -21,6 +22,7 @@ final readonly class GeneratedDocumentSource implements TrustedMimeTypeSource
      *
      * @return resource
      */
+    #[Override]
     public function openStream()
     {
         return (new ContentFileSource($this->contents))->openStream();
@@ -29,6 +31,7 @@ final readonly class GeneratedDocumentSource implements TrustedMimeTypeSource
     /**
      * Generated documents do not have an untrusted original filename.
      */
+    #[Override]
     public function originalFilename(): ?string
     {
         return null;
@@ -37,6 +40,7 @@ final readonly class GeneratedDocumentSource implements TrustedMimeTypeSource
     /**
      * Generated documents do not use a client-provided MIME type.
      */
+    #[Override]
     public function clientMimeType(): ?string
     {
         return null;
@@ -45,6 +49,7 @@ final readonly class GeneratedDocumentSource implements TrustedMimeTypeSource
     /**
      * Return the MIME type guaranteed by package-controlled serialization.
      */
+    #[Override]
     public function trustedMimeType(): string
     {
         return $this->mimeType;

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Exceptions\InvalidStoredFileModel;
 use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Models\StoredFile;
@@ -45,9 +47,9 @@ it('rejects a configured model whose table does not match package configuration 
 it('forwards an explicit temporary URL expiration from a stored file', function (): void {
     $expiration = now()->addMinute();
     $file = new StoredFile(['disk' => 'testing', 'path' => 'files/file.txt']);
-    $adapter = \Mockery::mock(\Illuminate\Filesystem\FilesystemAdapter::class);
+    $adapter = Mockery::mock(FilesystemAdapter::class);
 
-    \Illuminate\Support\Facades\Storage::shouldReceive('disk')
+    Storage::shouldReceive('disk')
         ->once()
         ->with('testing')
         ->andReturn($adapter);
