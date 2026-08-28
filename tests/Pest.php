@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Model;
 use Mattmy\FileMagic\Actions\StoreFile;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\PendingFile;
@@ -20,4 +21,18 @@ function pendingFile(FileSource $source): PendingFile
         app(StoreFile::class),
         app(FileMagicConfig::class),
     );
+}
+
+/**
+ * Return the integer key used by the package test models.
+ */
+function storedFileKey(Model $model): int
+{
+    $key = $model->getKey();
+
+    if (! is_int($key)) {
+        throw new RuntimeException('The stored file test model must have an integer key.');
+    }
+
+    return $key;
 }

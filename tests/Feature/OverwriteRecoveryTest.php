@@ -61,7 +61,7 @@ it('restores an existing object when overwrite storage returns false', function 
     $factory = Mockery::mock(FilesystemFactory::class);
     $restoredContents = null;
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('private');
@@ -101,7 +101,7 @@ it('does not start overwrite when the original visibility cannot be backed up', 
     $filesystem = Mockery::mock(Filesystem::class);
     $factory = Mockery::mock(FilesystemFactory::class);
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('unsupported');
@@ -119,7 +119,7 @@ it('preserves operation and recovery failures when overwrite restoration fails',
     $filesystem = Mockery::mock(Filesystem::class);
     $factory = Mockery::mock(FilesystemFactory::class);
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('private');

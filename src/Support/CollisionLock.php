@@ -154,6 +154,6 @@ final readonly class CollisionLock
      */
     private function key(string $disk, string $path): string
     {
-        return self::KEY_PREFIX . \hash(self::HASH_ALGORITHM, $disk . "\0" . $path);
+        return self::KEY_PREFIX.\hash(self::HASH_ALGORITHM, $disk."\0".$path);
     }
 }

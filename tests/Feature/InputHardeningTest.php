@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Contracts\SizeLimitedFileSource;
+use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Data\RemoteFileOptions;
 use Mattmy\FileMagic\Exceptions\DisallowedMimeType;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
@@ -20,6 +21,7 @@ use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\PendingFile;
 use Mattmy\FileMagic\Sources\Base64FileSource;
 use Mattmy\FileMagic\Sources\ContentFileSource;
+use Mattmy\FileMagic\Sources\RemoteFileSource;
 use Mattmy\FileMagic\Support\FileMagicConfig;
 
 beforeEach(function (): void {
@@ -58,9 +60,13 @@ it('rejects invalid store configuration before storage', function (string $key, 
 ]);
 
 it('keeps blocked MIME defaults only when the key is missing', function (): void {
+    $configuration = config('file-magic');
+
+    \assert(is_array($configuration));
+
     config()->set(
         'file-magic',
-        Arr::except(config('file-magic'), ['blocked_mime_types']),
+        Arr::except($configuration, ['blocked_mime_types']),
     );
 
     expect(app(FileMagicConfig::class)->blockedMimeTypes())
@@ -165,14 +171,17 @@ it('rejects oversized Base64 before decoding or mutating storage', function (str
     Storage::disk('testing')->assertDirectoryEmpty('/');
 })->with([
     'plain Base64' => [\base64_encode('123456')],
-    'data URI' => ['data:text/plain;base64,' . \base64_encode('123456')],
+    'data URI' => ['data:text/plain;base64,'.\base64_encode('123456')],
 ]);
 
 it('rejects invalid paths before Base64 decoding', function (Closure $configure, string $exception): void {
     $pending = FileMagic::fromBase64(\base64_encode('contents'));
     $source = $pending->source();
+    $configured = $configure($pending);
 
-    expect(static fn () => $configure($pending)->store())->toThrow($exception);
+    \assert($configured instanceof PendingFile);
+
+    expect(static fn () => $configured->store())->toThrow($exception);
 
     expect(inputHardeningHasDecodedCache($source))->toBeFalse()
         ->and(StoredFile::query()->count())->toBe(0);
@@ -190,8 +199,11 @@ it('rejects invalid paths before Base64 decoding', function (Closure $configure,
 
 it('rejects invalid paths before a remote request', function (Closure $configure, string $exception): void {
     Http::preventStrayRequests();
+    $configured = $configure(FileMagic::fromUrl('https://downloads.example.com/file.txt'));
 
-    expect(static fn () => $configure(FileMagic::fromUrl('https://downloads.example.com/file.txt'))->store())
+    \assert($configured instanceof PendingFile);
+
+    expect(static fn () => $configured->store())
         ->toThrow($exception);
 
     Http::assertNothingSent();
@@ -214,8 +226,11 @@ it('rejects original image policy failures before image processing', function (
 ): void {
     $source = new InputHardeningCountingSource(inputHardeningPng(100, 100));
     $pending = pendingFile($source)->resizeImage(maxWidth: 1, quality: 80);
+    $configured = $configure($pending);
 
-    expect(static fn () => $configure($pending)->store())->toThrow($exception);
+    \assert($configured instanceof PendingFile);
+
+    expect(static fn () => $configured->store())->toThrow($exception);
 
     expect($source->openedStreams)->toBe(1)
         ->and(StoredFile::query()->count())->toBe(0);
@@ -327,8 +342,7 @@ it('preserves a canonical nested directory', function (): void {
 it('accepts a filename at the length limit and rejects one above it', function (): void {
     $file = FileMagic::fromContent('contents')->named(\str_repeat('a', 200))->store();
 
-    expect($file)->toBeInstanceOf(StoredFile::class)
-        ->and(static fn () => FileMagic::fromContent('contents')->named(\str_repeat('a', 201))->store())
+    expect(static fn () => FileMagic::fromContent('contents')->named(\str_repeat('a', 201))->store())
         ->toThrow(InvalidFileName::class);
 });
 
@@ -337,7 +351,11 @@ it('rejects invalid operation options', function (Closure $operation): void {
 })->with([
     'empty disk' => [static fn (PendingFile $pending): PendingFile => $pending->onDisk('')],
     'zero maximum size' => [static fn (PendingFile $pending): PendingFile => $pending->maxSize(0)],
-    'associative MIME list' => [static fn (PendingFile $pending): PendingFile => $pending->allowMimeTypes(['mime' => 'text/plain'])],
+    // This test deliberately verifies rejection of a non-list MIME array.
+    'associative MIME list' => [static fn (PendingFile $pending): PendingFile => $pending->allowMimeTypes(
+        // @phpstan-ignore argument.type
+        ['mime' => 'text/plain'],
+    )],
     'empty MIME member' => [static fn (PendingFile $pending): PendingFile => $pending->blockMimeTypes([''])],
 ])->throws(InvalidConfiguration::class);
 
@@ -345,24 +363,25 @@ it('validates image configuration only when defaults are used', function (): voi
     config()->set('file-magic.image.quality', '80');
     config()->set('file-magic.image.max_width', '1920');
 
-    expect(FileMagic::fromContent('contents')->store())->toBeInstanceOf(StoredFile::class)
-        ->and(static fn () => FileMagic::fromContent('contents')->resizeImage())
+    FileMagic::fromContent('contents')->store();
+
+    expect(static fn () => FileMagic::fromContent('contents')->resizeImage())
         ->toThrow(InvalidConfiguration::class)
-        ->and(FileMagic::fromContent('contents')->resizeImage(maxWidth: 1, quality: 80))
-        ->toBeInstanceOf(PendingFile::class);
+        ->and(FileMagic::fromContent('contents')->resizeImage(maxWidth: 1, quality: 80)->imageOptions())
+        ->toBeInstanceOf(ImageOptions::class);
 });
 
 it('reads only the missing image defaults', function (): void {
     config()->set('file-magic.image.max_width', '1920');
 
-    expect(FileMagic::fromContent('contents')->resizeImage(maxWidth: 1))
-        ->toBeInstanceOf(PendingFile::class);
+    expect(FileMagic::fromContent('contents')->resizeImage(maxWidth: 1)->imageOptions())
+        ->toBeInstanceOf(ImageOptions::class);
 
     config()->set('file-magic.image.max_width', 1920);
     config()->set('file-magic.image.quality', '80');
 
-    expect(FileMagic::fromContent('contents')->resizeImage(quality: 80))
-        ->toBeInstanceOf(PendingFile::class);
+    expect(FileMagic::fromContent('contents')->resizeImage(quality: 80)->imageOptions())
+        ->toBeInstanceOf(ImageOptions::class);
 });
 
 it('accepts image configuration boundary values', function (): void {
@@ -382,17 +401,18 @@ it('validates remote defaults only when they are used', function (): void {
     config()->set('file-magic.remote.allowed_ports', ['443']);
 
     expect(static fn () => FileMagic::fromUrl('https://example.com/file.txt'))
-        ->toThrow(InvalidConfiguration::class)
-        ->and(FileMagic::fromContent('contents')->store())->toBeInstanceOf(StoredFile::class)
-        ->and(FileMagic::fromUrl('https://example.com/file.txt', new RemoteFileOptions()))
-        ->toBeInstanceOf(PendingFile::class);
+        ->toThrow(InvalidConfiguration::class);
+    FileMagic::fromContent('contents')->store();
+
+    expect(FileMagic::fromUrl('https://example.com/file.txt', new RemoteFileOptions)->source())
+        ->toBeInstanceOf(RemoteFileSource::class);
 });
 
 it('does not validate unused optional configuration', function (): void {
     config()->set('file-magic.remote.connect_timeout', '5');
     config()->set('file-magic.zip.max_size', '100');
 
-    expect(FileMagic::fromContent('contents')->store())->toBeInstanceOf(StoredFile::class);
+    expect(FileMagic::fromContent('contents')->store()->exists())->toBeTrue();
 });
 
 it('accepts remote configuration boundary values', function (): void {
@@ -402,11 +422,11 @@ it('accepts remote configuration boundary values', function (): void {
     config()->set('file-magic.remote.allowed_hosts', ['example.com']);
     config()->set('file-magic.remote.allowed_ports', [1, 65535]);
 
-    expect(FileMagic::fromUrl('https://example.com/file.txt'))->toBeInstanceOf(PendingFile::class);
+    expect(FileMagic::fromUrl('https://example.com/file.txt')->source())->toBeInstanceOf(RemoteFileSource::class);
 
     config()->set('file-magic.remote.max_redirects', 10);
 
-    expect(FileMagic::fromUrl('https://example.com/file.txt'))->toBeInstanceOf(PendingFile::class);
+    expect(FileMagic::fromUrl('https://example.com/file.txt')->source())->toBeInstanceOf(RemoteFileSource::class);
 });
 
 it('reads strict configuration reader boundaries', function (
@@ -518,11 +538,13 @@ it('resolves a required file before reading the default temporary URL TTL', func
 
 function inputHardeningPng(int $width, int $height): string
 {
+    \assert($width > 0 && $height > 0);
+
     $pixels = \random_bytes($width * $height * 3);
     $rows = '';
 
     for ($offset = 0; $offset < \strlen($pixels); $offset += $width * 3) {
-        $rows .= "\0" . \substr($pixels, $offset, $width * 3);
+        $rows .= "\0".\substr($pixels, $offset, $width * 3);
     }
 
     $compressed = \gzcompress($rows);
@@ -532,9 +554,9 @@ function inputHardeningPng(int $width, int $height): string
     }
 
     return "\x89PNG\r\n\x1a\n"
-        . inputHardeningPngChunk('IHDR', \pack('NNCCCCC', $width, $height, 8, 2, 0, 0, 0))
-        . inputHardeningPngChunk('IDAT', $compressed)
-        . inputHardeningPngChunk('IEND', '');
+        .inputHardeningPngChunk('IHDR', \pack('NNCCCCC', $width, $height, 8, 2, 0, 0, 0))
+        .inputHardeningPngChunk('IDAT', $compressed)
+        .inputHardeningPngChunk('IEND', '');
 }
 
 function inputHardeningHasDecodedCache(FileSource $source): bool
@@ -545,9 +567,9 @@ function inputHardeningHasDecodedCache(FileSource $source): bool
 function inputHardeningPngChunk(string $type, string $data): string
 {
     return \pack('N', \strlen($data))
-        . $type
-        . $data
-        . \pack('N', \crc32($type . $data));
+        .$type
+        .$data
+        .\pack('N', \crc32($type.$data));
 }
 
 final class InputHardeningCountingSource implements FileSource

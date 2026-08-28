@@ -45,7 +45,7 @@ final class DocumentFactory
             throw new InvalidDocumentData('The document data could not be encoded as JSON.', previous: $exception);
         }
 
-        return new GeneratedDocumentSource($contents . "\n", self::JSON_MIME_TYPE);
+        return new GeneratedDocumentSource($contents."\n", self::JSON_MIME_TYPE);
     }
 
     /**

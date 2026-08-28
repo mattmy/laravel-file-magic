@@ -16,7 +16,7 @@ use Override;
  * @method static \Mattmy\FileMagic\PendingFile text(string $text)
  * @method static \Mattmy\FileMagic\PendingFile json(array<array-key, mixed>|\JsonSerializable $data)
  * @method static \Mattmy\FileMagic\PendingFile csv(iterable<array-key, array<array-key, scalar|null>> $rows)
- * @method static \Mattmy\FileMagic\FileQuery find(int|string|\Mattmy\FileMagic\Models\StoredFile|array<array-key, int|string|\Mattmy\FileMagic\Models\StoredFile>|\Illuminate\Support\Collection<array-key, int|string|\Mattmy\FileMagic\Models\StoredFile> ...$targets)
+ * @method static \Mattmy\FileMagic\FileQuery find(int|string|\Mattmy\FileMagic\Models\StoredFile|array<array-key, int|string|\Mattmy\FileMagic\Models\StoredFile>|\Illuminate\Support\Collection<array-key, covariant int|string|\Mattmy\FileMagic\Models\StoredFile> ...$targets)
  */
 final class FileMagic extends Facade
 {

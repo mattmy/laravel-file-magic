@@ -11,7 +11,7 @@ use Mattmy\FileMagic\Tests\Fixtures\CompatibleStoredFile;
 
 it('does not use container helper calls in production classes', function (): void {
     $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator(__DIR__ . '/../../src'),
+        new RecursiveDirectoryIterator(__DIR__.'/../../src'),
     );
 
     foreach ($iterator as $file) {

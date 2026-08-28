@@ -234,7 +234,7 @@ final class AuditFilesCommand extends Command
     private function audit(?string $disk, int $chunkSize, bool $deleteMissingRecords): void
     {
         $modelClass = $this->models->resolve();
-        $model = new $modelClass();
+        $model = new $modelClass;
         $keyName = $model->getKeyName();
         $qualifiedKeyName = $model->qualifyColumn($keyName);
         $columns = [$keyName, 'disk', 'path'];
@@ -312,7 +312,7 @@ final class AuditFilesCommand extends Command
         if (
             $deleteMissingRecords &&
             (\is_string($locationHash) === false ||
-                $locationHash !== \hash('sha256', $disk . "\0" . $path))
+                $locationHash !== \hash('sha256', $disk."\0".$path))
         ) {
             $this->failed++;
             $this->writeUnknown($key, $disk, $path);

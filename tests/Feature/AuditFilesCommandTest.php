@@ -8,6 +8,7 @@ use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ use Mattmy\FileMagic\Support\CollisionLock;
 use Mattmy\FileMagic\Support\FileMagicConfig;
 use Mattmy\FileMagic\Tests\Fixtures\MismatchedDeleteStoredFile;
 use Mattmy\FileMagic\Tests\Fixtures\ScopedStoredFile;
-use Mattmy\FileMagic\Tests\TestCase;
+use Mockery\MockInterface;
 
 beforeEach(function (): void {
     Storage::fake('testing');
@@ -32,7 +33,6 @@ afterEach(function (): void {
 });
 
 it('reports a clean read-only audit', function (): void {
-    /** @var TestCase $this */
     FileMagic::fromContent('healthy')->store();
 
     $this->artisan('file-magic:audit')
@@ -43,7 +43,6 @@ it('reports a clean read-only audit', function (): void {
 });
 
 it('reports missing records without changing the database', function (): void {
-    /** @var TestCase $this */
     $file = FileMagic::fromContent('missing')->store();
     Storage::disk('testing')->delete($file->path);
 
@@ -65,7 +64,7 @@ it('keeps unknown records and performs exactly one existence check per record', 
     $filesystem->shouldReceive('exists')->once()->with($unknown->path)->andThrow(
         new RuntimeException('Storage unavailable.'),
     );
-    $this->app->instance(FilesystemFactory::class, $factory);
+    app()->instance(FilesystemFactory::class, $factory);
 
     $this->artisan('file-magic:audit')->assertExitCode(2);
 
@@ -87,7 +86,7 @@ it('filters one configured disk', function (): void {
 it('rejects invalid options before touching storage', function (array $options): void {
     $factory = Mockery::mock(FilesystemFactory::class);
     $factory->shouldNotReceive('disk');
-    $this->app->instance(FilesystemFactory::class, $factory);
+    app()->instance(FilesystemFactory::class, $factory);
 
     $this->artisan('file-magic:audit', $options)->assertExitCode(2);
 })->with([
@@ -137,7 +136,7 @@ it('keeps a cleanup candidate when its object reappears after locking', function
     \config()->set('file-magic.collision_lock.enabled', true);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->twice()->with($file->path)->andReturn(false, true);
-    $this->app->instance(FilesystemFactory::class, $factory);
+    app()->instance(FilesystemFactory::class, $factory);
 
     $this->artisan('file-magic:audit', [
         '--delete-missing-records' => true,
@@ -192,7 +191,7 @@ it('deletes confirmed missing records in one bulk query per chunk', function ():
     }
 
     $deleteQueries = 0;
-    DB::listen(static function ($query) use (&$deleteQueries): void {
+    DB::listen(static function (QueryExecuted $query) use (&$deleteQueries): void {
         if (\str_starts_with(\strtolower($query->sql), 'delete')) {
             $deleteQueries++;
         }
@@ -279,7 +278,7 @@ it('processes large record sets using the requested chunk size', function (): vo
 
     StoredFile::query()->insert($records);
     $selectQueries = 0;
-    DB::listen(static function ($query) use (&$selectQueries): void {
+    DB::listen(static function (QueryExecuted $query) use (&$selectQueries): void {
         if (
             \str_starts_with(\strtolower($query->sql), 'select') &&
             \str_contains($query->sql, 'stored_files')
@@ -300,6 +299,7 @@ it('processes large record sets using the requested chunk size', function (): vo
  */
 function installAuditLock(callable $acquire): void
 {
+    /** @var CacheFactory&MockInterface $cache */
     $cache = Mockery::mock(CacheFactory::class);
     $repository = Mockery::mock(Repository::class);
     $provider = Mockery::mock(LockProvider::class);

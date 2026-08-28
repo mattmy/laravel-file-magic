@@ -35,7 +35,7 @@ final readonly class StoredFileModelResolver
             throw new InvalidStoredFileModel('The configured file model must extend StoredFile.');
         }
 
-        if ((new $modelClass())->getTable() !== $this->fileMagicConfig->table()) {
+        if ((new $modelClass)->getTable() !== $this->fileMagicConfig->table()) {
             throw new InvalidStoredFileModel(
                 'The configured file model table must match the [file-magic.table] configuration.',
             );
@@ -50,7 +50,7 @@ final readonly class StoredFileModelResolver
     public function validateTarget(StoredFile $target): StoredFile
     {
         $modelClass = $this->resolve();
-        $configured = new $modelClass();
+        $configured = new $modelClass;
         $key = $target->getKey();
 
         if (

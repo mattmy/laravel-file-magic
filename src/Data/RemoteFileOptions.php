@@ -101,7 +101,7 @@ final readonly class RemoteFileOptions
     {
         if ($this->maxRedirects < 0 || $this->maxRedirects > self::MAX_REDIRECTS) {
             throw new InvalidRemoteOptions(
-                'The remote redirect limit must be between 0 and ' . self::MAX_REDIRECTS . '.',
+                'The remote redirect limit must be between 0 and '.self::MAX_REDIRECTS.'.',
             );
         }
     }

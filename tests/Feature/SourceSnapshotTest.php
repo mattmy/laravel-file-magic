@@ -43,7 +43,7 @@ it('stores a path snapshot when the original path changes before storage reads i
     $factory = Mockery::mock(FilesystemFactory::class);
     $storedContents = null;
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/path.txt')->andReturnFalse();
     $filesystem->shouldReceive('put')
@@ -63,7 +63,7 @@ it('stores a path snapshot when the original path changes before storage reads i
             ->and($file->size)->toBe(22)
             ->and($file->checksum)->toBe(\hash('sha256', 'captured path contents'));
     } finally {
-        (new Illuminate\Filesystem\Filesystem())->delete($path);
+        (new Illuminate\Filesystem\Filesystem)->delete($path);
     }
 });
 
@@ -103,6 +103,10 @@ it('processes images from a captured source without reopening the original', fun
     $file = pendingFile($source)->named('image')->resizeImage(maxWidth: 1, quality: 80)->store();
     $storedContents = Storage::disk('testing')->get($file->path);
 
+    if ($storedContents === null) {
+        throw new RuntimeException('The stored image contents could not be read.');
+    }
+
     expect($source->openedStreams)->toBe(1)
         ->and($file->mime_type)->toBe('image/png')
         ->and($file->size)->toBe(\strlen($storedContents))
@@ -110,7 +114,7 @@ it('processes images from a captured source without reopening the original', fun
 });
 
 it('opens independent snapshot readers and releases its temporary resource safely', function (): void {
-    $snapshot = (new FileInspector())->capture(
+    $snapshot = (new FileInspector)->capture(
         new ContentFileSource('snapshot contents', 'snapshot.txt'),
         'sha256',
         100,

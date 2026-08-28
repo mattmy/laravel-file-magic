@@ -88,7 +88,7 @@ final class FileSnapshot implements FileSource, ReleasableFileSource
             return;
         }
 
-        if ((new Filesystem())->delete($path)) {
+        if ((new Filesystem)->delete($path)) {
             $this->path = null;
         }
     }

@@ -139,7 +139,7 @@ final readonly class DeleteFiles
                 \is_string($path) === false ||
                 $path === '' ||
                 \is_string($locationHash) === false ||
-                $locationHash !== \hash('sha256', $disk . "\0" . $path)
+                $locationHash !== \hash('sha256', $disk."\0".$path)
             ) {
                 throw new FileRecordFailed('A stored-file record has an invalid deletion identity.');
             }
@@ -191,7 +191,7 @@ final readonly class DeleteFiles
     private function revalidate(array $snapshots): array
     {
         $modelClass = $this->models->resolve();
-        $model = new $modelClass();
+        $model = new $modelClass;
         $keys = \array_column($snapshots, 'key');
 
         try {
@@ -314,7 +314,7 @@ final readonly class DeleteFiles
 
         $keys = $this->modelKeys($files);
         $modelClass = $this->models->resolve();
-        $model = new $modelClass();
+        $model = new $modelClass;
 
         try {
             $deleted = $model->newQueryWithoutScopes()
@@ -387,6 +387,6 @@ final readonly class DeleteFiles
      */
     private function emptyFileCollection(): Collection
     {
-        return new Collection();
+        return new Collection;
     }
 }

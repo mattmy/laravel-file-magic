@@ -31,7 +31,7 @@ it('stores without resolving a cache lock when collision locking is disabled', f
 
     $cache = Mockery::mock(Factory::class);
     $cache->shouldNotReceive('store');
-    $this->app->instance(Factory::class, $cache);
+    $this->application()->instance(Factory::class, $cache);
 
     $file = FileMagic::fromContent('contents')->named('unlocked')->store();
 
@@ -93,7 +93,7 @@ it('acquires unique path locks in canonical order and releases them in reverse',
     ];
     $keys = \array_values(\array_unique(\array_map(
         static fn (array $location): string => 'file-magic:collision:'
-            . \hash('sha256', $location['disk'] . "\0" . $location['path']),
+            .\hash('sha256', $location['disk']."\0".$location['path']),
         $locations,
     )));
     \sort($keys, SORT_STRING);
@@ -369,7 +369,7 @@ it('does not let a contending store inspect or mutate the path while a writer ho
     $contenderAttempted = false;
     $puts = 0;
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->twice()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->with('files/same.txt')->andReturnFalse();
     $filesystem->shouldReceive('put')
@@ -399,7 +399,6 @@ it('does not let a contending store inspect or mutate the path while a writer ho
     $winner = FileMagic::fromContent('winner')->named('same')->store();
 
     expect($contenderFailed)->toBeTrue()
-        ->and($winner)->toBeInstanceOf(StoredFile::class)
         ->and(StoredFile::query()->count())->toBe(1)
         ->and($puts)->toBe(1);
 });
@@ -430,7 +429,7 @@ it('locks a generated suffix against an explicit request for that path', functio
     $factory = Mockery::mock(FilesystemFactory::class);
     $contenderFailed = false;
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->twice()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->ordered()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('exists')
@@ -475,9 +474,13 @@ it('keeps the path lock until overwrite recovery and backup cleanup finish', fun
     $lock = Mockery::mock(LockContract::class);
     $filesystem = Mockery::mock(Filesystem::class);
     $factory = Mockery::mock(FilesystemFactory::class);
-    $restoredStream = null;
+    $backupStream = new class
+    {
+        public mixed $value = null;
+    };
     $events = [];
-    $expectedKey = 'file-magic:collision:' . \hash('sha256', "testing\0files/same.txt");
+    $expectedKey = 'file-magic:collision:'.\hash('sha256', "testing\0files/same.txt");
+    $backupStreamIsOpen = static fn (): bool => \is_resource($backupStream->value);
 
     $cache->shouldReceive('store')->once()->with(null)->andReturn($repository);
     $repository->shouldReceive('getStore')->once()->andReturn($lockProvider);
@@ -492,19 +495,19 @@ it('keeps the path lock until overwrite recovery and backup cleanup finish', fun
         });
     $lock->shouldReceive('release')
         ->once()
-        ->andReturnUsing(function () use (&$events, &$restoredStream): bool {
-            $events[] = \is_resource($restoredStream)
+        ->andReturnUsing(function () use (&$events, $backupStreamIsOpen): bool {
+            $events[] = $backupStreamIsOpen()
                 ? 'lock released before backup close'
                 : 'lock released after backup close';
 
             return true;
         });
 
-    $this->app->instance(CollisionLock::class, new CollisionLock(
+    $this->application()->instance(CollisionLock::class, new CollisionLock(
         $cache,
         app(FileMagicConfig::class),
     ));
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('private');
@@ -515,8 +518,8 @@ it('keeps the path lock until overwrite recovery and backup cleanup finish', fun
     $filesystem->shouldReceive('put')
         ->once()
         ->ordered()
-        ->withArgs(function (string $path, mixed $stream, array $options) use (&$restoredStream, &$events): bool {
-            $restoredStream = $stream;
+        ->withArgs(function (string $path, mixed $stream, array $options) use ($backupStream, &$events): bool {
+            $backupStream->value = $stream;
             $events[] = 'backup restored';
 
             return $path === 'files/same.txt' && $options === ['visibility' => 'private'];

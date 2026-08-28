@@ -27,7 +27,7 @@ final class FileQuery
     /**
      * Create a file query from normalized public targets.
      *
-     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, int|string|StoredFile>>  $targets
+     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, covariant int|string|StoredFile>>  $targets
      */
     public function __construct(
         private readonly FileFinder $finder,

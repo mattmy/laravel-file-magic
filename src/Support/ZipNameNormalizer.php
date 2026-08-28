@@ -26,8 +26,8 @@ final readonly class ZipNameNormalizer
     {
         if ($name === null) {
             return self::DEFAULT_NAME_PREFIX
-                . \bin2hex(\random_bytes(self::RANDOM_NAME_BYTES))
-                . self::ZIP_EXTENSION;
+                .\bin2hex(\random_bytes(self::RANDOM_NAME_BYTES))
+                .self::ZIP_EXTENSION;
         }
 
         $name = \trim($name);
@@ -36,7 +36,7 @@ final readonly class ZipNameNormalizer
             $name = \substr($name, 0, -\strlen(self::ZIP_EXTENSION));
         }
 
-        return $this->paths->filename($name) . self::ZIP_EXTENSION;
+        return $this->paths->filename($name).self::ZIP_EXTENSION;
     }
 
     /**
@@ -109,7 +109,7 @@ final readonly class ZipNameNormalizer
             - \mb_strlen($suffixText);
 
         return \mb_substr($stem, 0, \max(1, $maximumStemLength))
-            . $suffixText
-            . $extension;
+            .$suffixText
+            .$extension;
     }
 }

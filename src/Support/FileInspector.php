@@ -102,7 +102,7 @@ final class FileInspector
             \fclose($stream);
 
             if (\is_string($path)) {
-                (new Filesystem())->delete($path);
+                (new Filesystem)->delete($path);
             }
         }
     }

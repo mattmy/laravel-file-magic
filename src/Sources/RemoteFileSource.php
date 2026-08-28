@@ -92,7 +92,7 @@ final class RemoteFileSource implements FileSource, ReleasableFileSource, SizeLi
             return;
         }
 
-        if ((new Filesystem())->delete($this->download->path)) {
+        if ((new Filesystem)->delete($this->download->path)) {
             $this->download = null;
         }
     }

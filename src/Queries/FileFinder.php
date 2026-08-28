@@ -22,7 +22,7 @@ final readonly class FileFinder
     /**
      * Resolve file targets while preserving input order and removing duplicates.
      *
-     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, int|string|StoredFile>>  $targets
+     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, covariant int|string|StoredFile>>  $targets
      * @return EloquentCollection<int, StoredFile>
      */
     public function find(array $targets): EloquentCollection
@@ -33,7 +33,7 @@ final readonly class FileFinder
             fn (StoredFile $file): string => (string) $this->modelKey($file),
         );
         $filesByUuid = $storedFiles->keyBy('uuid');
-        $resolvedFiles = new EloquentCollection();
+        $resolvedFiles = new EloquentCollection;
         $resolvedKeys = [];
 
         foreach ($normalizedTargets as $target) {
@@ -63,7 +63,7 @@ final readonly class FileFinder
     /**
      * Normalize variadic, array and Collection targets into one strict list.
      *
-     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, int|string|StoredFile>>  $targets
+     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, covariant int|string|StoredFile>>  $targets
      * @return list<int|string|StoredFile>
      */
     private function normalize(array $targets): array
@@ -127,11 +127,11 @@ final readonly class FileFinder
         }
 
         if ($ids === [] && $uuids === []) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         $modelClass = $this->models->resolve();
-        $keyName = (new $modelClass())->getKeyName();
+        $keyName = (new $modelClass)->getKeyName();
 
         return $modelClass::query()
             ->where(function (Builder $query) use ($ids, $keyName, $uuids): void {

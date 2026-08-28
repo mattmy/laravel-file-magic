@@ -27,7 +27,7 @@ beforeEach(function (): void {
         'private.example.com' => ['127.0.0.1'],
         'mixed.example.com' => ['93.184.216.34', '100.64.0.1'],
     ]);
-    $this->app->instance(HostResolver::class, $this->hostResolver);
+    $this->application()->instance(HostResolver::class, $this->hostResolver);
 });
 
 it('rejects non-global IPv4 addresses', function (string $address): void {
@@ -36,7 +36,7 @@ it('rejects non-global IPv4 addresses', function (string $address): void {
     ]));
 
     expect(
-        static fn () => $guard->validate('https://special.example.com/file.txt', new RemoteFileOptions()),
+        static fn () => $guard->validate('https://special.example.com/file.txt', new RemoteFileOptions),
     )->toThrow(RemoteAccessDenied::class);
 
     Http::assertNothingSent();
@@ -62,7 +62,7 @@ it('allows IPv4 addresses outside the shared and benchmarking ranges', function 
         'public.example.com' => [$address],
     ]));
 
-    $endpoint = $guard->validate('https://public.example.com/file.txt', new RemoteFileOptions());
+    $endpoint = $guard->validate('https://public.example.com/file.txt', new RemoteFileOptions);
 
     expect($endpoint->ipAddress)->toBe($address);
 })->with([
@@ -79,7 +79,7 @@ it('rejects non-global IPv6 addresses including every IPv4-mapped address', func
     ]));
 
     expect(
-        static fn () => $guard->validate('https://special.example.com/file.txt', new RemoteFileOptions()),
+        static fn () => $guard->validate('https://special.example.com/file.txt', new RemoteFileOptions),
     )->toThrow(RemoteAccessDenied::class);
 
     Http::assertNothingSent();
@@ -101,13 +101,13 @@ it('allows ordinary public IPv6 addresses', function (): void {
         'public.example.com' => ['2001:4860:4860::8888'],
     ]));
 
-    $endpoint = $guard->validate('https://public.example.com/file.txt', new RemoteFileOptions());
+    $endpoint = $guard->validate('https://public.example.com/file.txt', new RemoteFileOptions);
 
     expect($endpoint->ipAddress)->toBe('2001:4860:4860::8888');
 });
 
 it('canonicalizes a trailing-dot hostname before resolving and pinning it', function (): void {
-    $endpoint = $this->app->make(RemoteUrlGuard::class)->validate(
+    $endpoint = $this->application()->make(RemoteUrlGuard::class)->validate(
         'https://DOWNLOADS.EXAMPLE.COM.:8443/file.pdf?token=value',
         new RemoteFileOptions(allowedPorts: [8443]),
     );
@@ -344,11 +344,11 @@ it('cleans the temporary download after successful storage', function (): void {
     Http::fake([
         'https://downloads.example.com/temporary.txt' => Http::response('temporary'),
     ]);
-    $before = \glob(\sys_get_temp_dir() . '/file-magic-url-*') ?: [];
+    $before = \glob(\sys_get_temp_dir().'/file-magic-url-*') ?: [];
 
     FileMagic::fromUrl('https://downloads.example.com/temporary.txt')->store();
 
-    $after = \glob(\sys_get_temp_dir() . '/file-magic-url-*') ?: [];
+    $after = \glob(\sys_get_temp_dir().'/file-magic-url-*') ?: [];
 
     expect($after)->toBe($before);
 });
