@@ -57,6 +57,9 @@
         }
     },
     "config": {
+        "audit": {
+            "abandoned": "report"
+        },
         "allow-plugins": {
             "pestphp/pest-plugin": true
         },
