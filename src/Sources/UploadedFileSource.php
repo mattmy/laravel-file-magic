@@ -7,6 +7,7 @@ namespace Mattmy\FileMagic\Sources;
 use Illuminate\Http\UploadedFile;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
+use Override;
 
 final readonly class UploadedFileSource implements FileSource
 {
@@ -25,6 +26,7 @@ final readonly class UploadedFileSource implements FileSource
      *
      * @return resource
      */
+    #[Override]
     public function openStream()
     {
         $stream = \fopen($this->file->getPathname(), 'rb');
@@ -39,6 +41,7 @@ final readonly class UploadedFileSource implements FileSource
     /**
      * Return the client-provided original filename.
      */
+    #[Override]
     public function originalFilename(): string
     {
         return $this->file->getClientOriginalName();
@@ -47,6 +50,7 @@ final readonly class UploadedFileSource implements FileSource
     /**
      * Return the client-provided MIME type.
      */
+    #[Override]
     public function clientMimeType(): string
     {
         return $this->file->getClientMimeType();

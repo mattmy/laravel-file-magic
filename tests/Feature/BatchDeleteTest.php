@@ -13,7 +13,9 @@ use Mattmy\FileMagic\Exceptions\FileRecordFailed;
 use Mattmy\FileMagic\Exceptions\PartialFileDeletion;
 use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Models\StoredFile;
+use Mattmy\FileMagic\Support\CollisionLock;
 use Mattmy\FileMagic\Support\StoredFileModelResolver;
+use Mattmy\FileMagic\Tests\Fixtures\MismatchedDeleteStoredFile;
 use Mattmy\FileMagic\Tests\Fixtures\TrackingStoredFile;
 
 beforeEach(function (): void {
@@ -22,11 +24,18 @@ beforeEach(function (): void {
     TrackingStoredFile::$queriesWithoutScopes = 0;
 });
 
+it('returns zero for an empty batch without resolving storage', function (): void {
+    $factory = Mockery::mock(FilesystemFactory::class);
+    $factory->shouldNotReceive('disk');
+
+    expect(batchDeleteAction($factory)->execute(new Collection()))->toBe(0);
+});
+
 it('uses one disk deletion and no existence checks on the successful path', function (): void {
     $first = FileMagic::fromContent('first')->store();
     $second = FileMagic::fromContent('second')->store();
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
     $files = new Collection([$first, $second]);
 
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
@@ -45,8 +54,8 @@ it('uses one disk deletion and no existence checks on the successful path', func
 it('deletes only confirmed missing records after a partial disk failure', function (): void {
     $deletedFile = FileMagic::fromContent('deleted')->store();
     $remainingFile = FileMagic::fromContent('remaining')->store();
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('delete')->once()->andReturnFalse();
@@ -72,8 +81,8 @@ it('deletes only confirmed missing records after a partial disk failure', functi
 it('treats a false bulk result as success when every object is missing', function (): void {
     $first = FileMagic::fromContent('first')->store();
     $second = FileMagic::fromContent('second')->store();
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('delete')->once()->andReturnFalse();
@@ -88,9 +97,9 @@ it('treats a false bulk result as success when every object is missing', functio
 it('continues deleting later disks after an earlier disk fails', function (): void {
     $failedFile = FileMagic::fromContent('failed')->onDisk('testing')->store();
     $deletedFile = FileMagic::fromContent('deleted')->onDisk('other')->store();
-    $failedFilesystem = \Mockery::mock(Filesystem::class);
-    $successfulFilesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $failedFilesystem = Mockery::mock(Filesystem::class);
+    $successfulFilesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($failedFilesystem);
     $factory->shouldReceive('disk')->once()->with('other')->andReturn($successfulFilesystem);
@@ -114,8 +123,8 @@ it('continues deleting later disks after an earlier disk fails', function (): vo
 
 it('keeps records whose storage state cannot be verified', function (): void {
     $file = FileMagic::fromContent('unknown')->store();
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('delete')->once()->andThrow(new RuntimeException('Delete failed.'));
@@ -136,17 +145,15 @@ it('keeps records whose storage state cannot be verified', function (): void {
 });
 
 it('fails explicitly when deleted record counts do not match confirmed objects', function (): void {
-    $first = FileMagic::fromContent('first')->store();
-    $stale = FileMagic::fromContent('stale')->store();
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
-    $files = new Collection([$first, $stale]);
+    \config()->set('file-magic.model', MismatchedDeleteStoredFile::class);
+    $file = FileMagic::fromContent('first')->store();
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
-    StoredFile::query()->whereKey($stale->id)->delete();
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('delete')->once()->andReturnTrue();
 
-    batchDeleteAction($factory)->execute($files);
+    batchDeleteAction($factory)->execute(new Collection([$file]));
 })->throws(FileRecordFailed::class);
 
 it('uses the configured custom model for store find and batch delete', function (): void {
@@ -163,7 +170,7 @@ it('uses the configured custom model for store find and batch delete', function 
     expect($file)->toBeInstanceOf(TrackingStoredFile::class)
         ->and($found)->toBeInstanceOf(TrackingStoredFile::class)
         ->and($deleted)->toBe(1)
-        ->and(TrackingStoredFile::$queriesWithoutScopes - $queriesBeforeDeletion)->toBe(3)
+        ->and(TrackingStoredFile::$queriesWithoutScopes - $queriesBeforeDeletion)->toBe(5)
         ->and(TrackingStoredFile::query()->count())->toBe(0);
 });
 
@@ -172,5 +179,9 @@ it('uses the configured custom model for store find and batch delete', function 
  */
 function batchDeleteAction(FilesystemFactory $factory): DeleteFiles
 {
-    return new DeleteFiles($factory, \app(StoredFileModelResolver::class));
+    return new DeleteFiles(
+        $factory,
+        \app(StoredFileModelResolver::class),
+        \app(CollisionLock::class),
+    );
 }

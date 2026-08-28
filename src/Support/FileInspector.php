@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic\Support;
 
 use finfo;
+use Illuminate\Filesystem\Filesystem;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Contracts\TrustedMimeTypeSource;
 use Mattmy\FileMagic\Data\FileMetadata;
@@ -101,7 +102,7 @@ final class FileInspector
             \fclose($stream);
 
             if (\is_string($path)) {
-                @\unlink($path);
+                (new Filesystem())->delete($path);
             }
         }
     }

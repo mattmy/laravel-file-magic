@@ -129,6 +129,8 @@ $deleted = FileMagic::find($targets)->delete();
 ```
 
 應用程式必須先確認使用者有權限操作每個要讀取、下載或刪除的檔案。
+啟用 collision lock 時，儲存、`FileQuery::delete()` 與 audit cleanup 會協調相同 storage path；
+direct `StoredFile::delete()` 與外部 mutation 不在此保證範圍。
 
 ## 一致性稽核
 
@@ -138,7 +140,8 @@ $deleted = FileMagic::find($targets)->delete();
 php artisan file-magic:audit
 ```
 
-除非加上 `--delete-missing-records`，否則指令不會修改資料。遠端 disk 可能增加網路
+除非加上 `--delete-missing-records`，否則指令不會修改資料。Cleanup 會在鎖內重新確認 record
+identity，並在刪除前再次檢查 storage。遠端 disk 可能增加網路
 等待時間與 storage request 費用，排程清理前請先閱讀稽核文件。
 
 ## 處理錯誤

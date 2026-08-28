@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic\Facades;
 
 use Illuminate\Support\Facades\Facade;
+use Override;
 
 /**
  * @method static \Mattmy\FileMagic\PendingFile fromUpload(\Illuminate\Http\UploadedFile $file)
@@ -21,6 +22,7 @@ final class FileMagic extends Facade
     /**
      * Return the service container binding name.
      */
+    #[Override]
     protected static function getFacadeAccessor(): string
     {
         return \Mattmy\FileMagic\FileMagic::class;

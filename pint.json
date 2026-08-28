@@ -1,47 +1,6 @@
 {
     "preset": "laravel",
     "rules": {
-        "concat_space": {
-            "spacing": "one"
-        },
-
-        "new_with_parentheses": true,
-
-        "fully_qualified_strict_types": false,
-
-        "no_superfluous_phpdoc_tags": false,
-
-        "phpdoc_separation": false,
-
-        "ordered_imports": {
-            "sort_algorithm": "alpha"
-        },
-
-        "single_quote": true,
-
-        "trailing_comma_in_multiline": {
-            "elements": [
-                "arguments",
-                "arrays",
-                "match",
-                "parameters"
-            ]
-        },
-
-        "binary_operator_spaces": {
-            "default": "single_space"
-        },
-
-        "array_indentation": true,
-
-        "trim_array_spaces": true,
-
-        "whitespace_after_comma_in_array": true,
-
-        "method_argument_space": {
-            "on_multiline": "ensure_fully_multiline"
-        },
-
         "blank_line_before_statement": {
             "statements": [
                 "break",
@@ -52,24 +11,23 @@
                 "try"
             ]
         },
-
-        "no_unused_imports": true,
-
-        "no_trailing_whitespace": true,
-
-        "no_whitespace_in_blank_line": true,
-
-        "single_blank_line_at_eof": true,
-
-        "class_attributes_separation": {
-            "elements": {
-                "method": "one",
-                "property": "one",
-                "trait_import": "none",
-                "const": "one"
-            }
+        "concat_space": {
+            "spacing": "one"
         },
-
+        "declare_strict_types": true,
+        "explicit_string_variable": true,
+        "fully_qualified_strict_types": {
+            "import_symbols": true
+        },
+        "method_argument_space": {
+            "on_multiline": "ensure_fully_multiline"
+        },
+        "new_with_parentheses": true,
+        "no_superfluous_phpdoc_tags": {
+            "allow_mixed": true,
+            "allow_unused_params": false,
+            "remove_inheritdoc": false
+        },
         "ordered_class_elements": {
             "order": [
                 "use_trait",
@@ -87,6 +45,22 @@
                 "method_public",
                 "method_protected",
                 "method_private"
+            ]
+        },
+        "ordered_imports": {
+            "imports_order": [
+                "const",
+                "class",
+                "function"
+            ],
+            "sort_algorithm": "alpha"
+        },
+        "trailing_comma_in_multiline": {
+            "elements": [
+                "arguments",
+                "arrays",
+                "match",
+                "parameters"
             ]
         }
     }

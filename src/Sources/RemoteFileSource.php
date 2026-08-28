@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mattmy\FileMagic\Sources;
 
+use Illuminate\Filesystem\Filesystem;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Contracts\ReleasableFileSource;
 use Mattmy\FileMagic\Contracts\SizeLimitedFileSource;
@@ -11,6 +12,7 @@ use Mattmy\FileMagic\Data\RemoteDownload;
 use Mattmy\FileMagic\Data\RemoteFileOptions;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
 use Mattmy\FileMagic\Support\RemoteDownloader;
+use Override;
 
 final class RemoteFileSource implements FileSource, ReleasableFileSource, SizeLimitedFileSource
 {
@@ -30,6 +32,7 @@ final class RemoteFileSource implements FileSource, ReleasableFileSource, SizeLi
     /**
      * Apply the storage operation's byte limit before materialization.
      */
+    #[Override]
     public function limitSize(int $bytes): void
     {
         $this->maximumBytes = $bytes;
@@ -40,6 +43,7 @@ final class RemoteFileSource implements FileSource, ReleasableFileSource, SizeLi
      *
      * @return resource
      */
+    #[Override]
     public function openStream()
     {
         $download = $this->materialize();
@@ -55,6 +59,7 @@ final class RemoteFileSource implements FileSource, ReleasableFileSource, SizeLi
     /**
      * Return the untrusted remote filename hint when available.
      */
+    #[Override]
     public function originalFilename(): ?string
     {
         return $this->materialize()->originalFilename;
@@ -63,6 +68,7 @@ final class RemoteFileSource implements FileSource, ReleasableFileSource, SizeLi
     /**
      * Return the untrusted remote MIME hint when available.
      */
+    #[Override]
     public function clientMimeType(): ?string
     {
         return $this->materialize()->clientMimeType;
@@ -79,14 +85,16 @@ final class RemoteFileSource implements FileSource, ReleasableFileSource, SizeLi
     /**
      * Delete the materialized temporary file.
      */
+    #[Override]
     public function release(): void
     {
         if ($this->download === null) {
             return;
         }
 
-        @\unlink($this->download->path);
-        $this->download = null;
+        if ((new Filesystem())->delete($this->download->path)) {
+            $this->download = null;
+        }
     }
 
     /**

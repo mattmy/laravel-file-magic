@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Cache\Factory as CacheFactory;
+use Illuminate\Contracts\Cache\Lock as LockContract;
+use Illuminate\Contracts\Cache\LockProvider;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Schema\Blueprint;
@@ -11,6 +15,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Models\StoredFile;
+use Mattmy\FileMagic\Support\CollisionLock;
+use Mattmy\FileMagic\Support\FileMagicConfig;
 use Mattmy\FileMagic\Tests\Fixtures\MismatchedDeleteStoredFile;
 use Mattmy\FileMagic\Tests\Fixtures\ScopedStoredFile;
 
@@ -48,8 +54,8 @@ it('reports missing records without changing the database', function (): void {
 it('keeps unknown records and performs exactly one existence check per record', function (): void {
     $healthy = FileMagic::fromContent('healthy')->store();
     $unknown = FileMagic::fromContent('unknown')->store();
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with($healthy->path)->andReturnTrue();
@@ -76,7 +82,7 @@ it('filters one configured disk', function (): void {
 });
 
 it('rejects invalid options before touching storage', function (array $options): void {
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
     $factory->shouldNotReceive('disk');
     $this->app->instance(FilesystemFactory::class, $factory);
 
@@ -118,6 +124,45 @@ it('accepts interactive deletion confirmation', function (): void {
         ->assertExitCode(0);
 
     expect($file->fresh())->toBeNull();
+});
+
+it('keeps a cleanup candidate when its object reappears after locking', function (): void {
+    $file = FileMagic::fromContent('reappeared')->store();
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
+
+    \config()->set('file-magic.collision_lock.enabled', true);
+    $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
+    $filesystem->shouldReceive('exists')->twice()->with($file->path)->andReturn(false, true);
+    $this->app->instance(FilesystemFactory::class, $factory);
+
+    $this->artisan('file-magic:audit', [
+        '--delete-missing-records' => true,
+        '--force' => true,
+    ])->assertExitCode(0);
+
+    expect($file->fresh())->not->toBeNull();
+});
+
+it('keeps a cleanup candidate whose identity changes after locking', function (): void {
+    $file = FileMagic::fromContent('changed')->store();
+    Storage::disk('testing')->delete($file->path);
+
+    installAuditLock(function () use ($file): bool {
+        StoredFile::query()->whereKey($file->id)->update([
+            'path' => 'files/replacement.txt',
+            'location_hash' => \hash('sha256', "testing\0files/replacement.txt"),
+        ]);
+
+        return true;
+    });
+
+    $this->artisan('file-magic:audit', [
+        '--delete-missing-records' => true,
+        '--force' => true,
+    ])->assertExitCode(2);
+
+    expect($file->fresh()?->path)->toBe('files/replacement.txt');
 });
 
 it('requires force for non-interactive deletion', function (): void {
@@ -189,12 +234,14 @@ it('uses a custom connection table primary key and ignores global scopes', funct
         $table->id('file_key');
         $table->string('disk');
         $table->string('path');
+        $table->string('location_hash', 64);
     });
     \config()->set('file-magic.model', ScopedStoredFile::class);
     \config()->set('file-magic.table', 'audit_stored_files');
     DB::connection('audit')->table('audit_stored_files')->insert([
         'disk' => 'testing',
         'path' => 'missing/custom.txt',
+        'location_hash' => \hash('sha256', "testing\0missing/custom.txt"),
     ]);
 
     $this->artisan('file-magic:audit', [
@@ -242,3 +289,29 @@ it('processes large record sets using the requested chunk size', function (): vo
 
     expect($selectQueries)->toBe(4);
 });
+
+/**
+ * Install one controlled audit lock at the cache boundary.
+ *
+ * @param  callable(): bool  $acquire
+ */
+function installAuditLock(callable $acquire): void
+{
+    $cache = Mockery::mock(CacheFactory::class);
+    $repository = Mockery::mock(Repository::class);
+    $provider = Mockery::mock(LockProvider::class);
+    $lock = Mockery::mock(LockContract::class);
+
+    \config()->set('file-magic.collision_lock.enabled', true);
+    $cache->shouldReceive('store')->once()->with(null)->andReturn($repository);
+    $repository->shouldReceive('getStore')->once()->andReturn($provider);
+    $provider->shouldReceive('lock')->once()->andReturn($lock);
+    $lock->shouldReceive('block')->once()->with(1)->andReturnUsing($acquire);
+    $lock->shouldReceive('release')->once()->andReturnTrue();
+    $lock->shouldNotReceive('forceRelease');
+
+    app()->instance(CollisionLock::class, new CollisionLock(
+        $cache,
+        app(FileMagicConfig::class),
+    ));
+}

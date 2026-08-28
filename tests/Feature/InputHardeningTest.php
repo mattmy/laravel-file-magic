@@ -528,7 +528,7 @@ function inputHardeningPng(int $width, int $height): string
     $compressed = \gzcompress($rows);
 
     if ($compressed === false) {
-        throw new \RuntimeException('The PNG fixture could not be compressed.');
+        throw new RuntimeException('The PNG fixture could not be compressed.');
     }
 
     return "\x89PNG\r\n\x1a\n"
@@ -564,6 +564,7 @@ final class InputHardeningCountingSource implements FileSource
      *
      * @return resource
      */
+    #[Override]
     public function openStream()
     {
         $this->openedStreams++;
@@ -574,6 +575,7 @@ final class InputHardeningCountingSource implements FileSource
     /**
      * Return no original filename.
      */
+    #[Override]
     public function originalFilename(): ?string
     {
         return null;
@@ -582,6 +584,7 @@ final class InputHardeningCountingSource implements FileSource
     /**
      * Return no client MIME hint.
      */
+    #[Override]
     public function clientMimeType(): ?string
     {
         return null;

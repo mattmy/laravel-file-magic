@@ -6,6 +6,7 @@ namespace Mattmy\FileMagic\Support;
 
 use GuzzleHttp\Psr7\Uri;
 use GuzzleHttp\Psr7\UriResolver;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Response;
@@ -51,7 +52,7 @@ final readonly class RemoteDownloader
         try {
             return $this->follow($url, $path, $options, $maximumBytes);
         } catch (Throwable $exception) {
-            @\unlink($path);
+            (new Filesystem())->delete($path);
 
             if ($exception instanceof FileMagicException) {
                 throw $exception;

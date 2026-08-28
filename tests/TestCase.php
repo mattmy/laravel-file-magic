@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic\Tests;
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Foundation\Application;
 use Mattmy\FileMagic\FileMagicServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Override;
 use RuntimeException;
 
 abstract class TestCase extends Orchestra
@@ -16,6 +18,7 @@ abstract class TestCase extends Orchestra
     /**
      * Run the publishable package migration for each isolated test.
      */
+    #[Override]
     protected function setUp(): void
     {
         parent::setUp();
@@ -33,6 +36,7 @@ abstract class TestCase extends Orchestra
     /**
      * Roll back the publishable package migration after each isolated test.
      */
+    #[Override]
     protected function tearDown(): void
     {
         $this->migration->down();
@@ -43,9 +47,10 @@ abstract class TestCase extends Orchestra
     /**
      * Register the package service provider.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param  Application  $app
      * @return list<class-string>
      */
+    #[Override]
     protected function getPackageProviders($app): array
     {
         return [FileMagicServiceProvider::class];
@@ -54,8 +59,9 @@ abstract class TestCase extends Orchestra
     /**
      * Configure the isolated Laravel application.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param  Application  $app
      */
+    #[Override]
     protected function defineEnvironment($app): void
     {
         $app['config']->set('database.default', 'testing');

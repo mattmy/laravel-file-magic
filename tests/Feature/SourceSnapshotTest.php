@@ -39,8 +39,8 @@ it('stores a path snapshot when the original path changes before storage reads i
 
     \file_put_contents($path, 'captured path contents');
 
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
     $storedContents = null;
 
     $this->app->instance(FilesystemFactory::class, $factory);
@@ -63,7 +63,7 @@ it('stores a path snapshot when the original path changes before storage reads i
             ->and($file->size)->toBe(22)
             ->and($file->checksum)->toBe(\hash('sha256', 'captured path contents'));
     } finally {
-        @\unlink($path);
+        (new Illuminate\Filesystem\Filesystem())->delete($path);
     }
 });
 
@@ -142,12 +142,20 @@ final class ChangingSnapshotSource implements FileSource
 {
     public int $openedStreams = 0;
 
+    /**
+     * Create a source whose content changes after the first read.
+     */
     public function __construct(
         private readonly string $firstContents,
         private readonly string $laterContents,
     ) {}
 
-    /** @return resource */
+    /**
+     * Open the next source version.
+     *
+     * @return resource
+     */
+    #[Override]
     public function openStream()
     {
         $this->openedStreams++;
@@ -158,11 +166,19 @@ final class ChangingSnapshotSource implements FileSource
         ))->openStream();
     }
 
+    /**
+     * Return the stable original filename.
+     */
+    #[Override]
     public function originalFilename(): string
     {
         return 'changing.txt';
     }
 
+    /**
+     * Return no client MIME hint.
+     */
+    #[Override]
     public function clientMimeType(): null
     {
         return null;

@@ -6,6 +6,7 @@ namespace Mattmy\FileMagic\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Builder;
 use Mattmy\FileMagic\Models\StoredFile;
+use Override;
 
 final class ScopedStoredFile extends StoredFile
 {
@@ -33,6 +34,7 @@ final class ScopedStoredFile extends StoredFile
     /**
      * Register a scope that must not hide records from maintenance operations.
      */
+    #[Override]
     protected static function booted(): void
     {
         self::addGlobalScope(

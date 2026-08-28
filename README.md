@@ -133,6 +133,8 @@ $deleted = FileMagic::find($targets)->delete();
 ```
 
 Applications must authorize every file before reading, downloading, or deleting it.
+When collision locking is enabled, stores, `FileQuery::delete()`, and audit cleanup coordinate
+the same storage path; direct `StoredFile::delete()` and external mutations are outside that guarantee.
 
 ## Consistency audits
 
@@ -142,7 +144,8 @@ Check whether database records still have matching files on storage:
 php artisan file-magic:audit
 ```
 
-The command is read-only unless `--delete-missing-records` is supplied. Remote disks may
+The command is read-only unless `--delete-missing-records` is supplied. Cleanup revalidates each
+locked record and checks storage again before deletion. Remote disks may
 add network time and storage request charges, so review the audit guide before scheduling
 cleanup.
 

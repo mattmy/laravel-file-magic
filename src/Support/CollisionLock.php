@@ -6,9 +6,11 @@ namespace Mattmy\FileMagic\Support;
 
 use Illuminate\Cache\NullStore;
 use Illuminate\Contracts\Cache\Factory as CacheFactory;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Contracts\Cache\LockProvider;
 use Mattmy\FileMagic\Exceptions\FileWriteFailed;
 use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
+use RuntimeException;
 use Throwable;
 
 final readonly class CollisionLock
@@ -68,30 +70,83 @@ final readonly class CollisionLock
      */
     public function run(string $disk, string $path, callable $callback): mixed
     {
+        return $this->runMany([
+            ['disk' => $disk, 'path' => $path],
+        ], $callback);
+    }
+
+    /**
+     * Run a callback while owning every distinct disk and path identity.
+     *
+     * @template TResult
+     *
+     * @param  list<array{disk: string, path: string}>  $locations
+     * @param  callable(): TResult  $callback
+     * @return TResult
+     */
+    public function runMany(array $locations, callable $callback): mixed
+    {
         if ($this->locks === null) {
             return $callback();
         }
 
+        $keys = \array_values(\array_unique(\array_map(
+            fn (array $location): string => $this->key($location['disk'], $location['path']),
+            $locations,
+        )));
+        \sort($keys, SORT_STRING);
+
+        /** @var list<Lock> $acquired */
+        $acquired = [];
         $callbackStarted = false;
+        $failure = null;
+
+        /** @var array{value?: TResult} $result */
+        $result = [];
 
         try {
-            return $this->locks
-                ->lock($this->key($disk, $path), $this->leaseSeconds)
-                ->block($this->waitSeconds, function () use ($callback, &$callbackStarted): mixed {
-                    $callbackStarted = true;
+            foreach ($keys as $key) {
+                $lock = $this->locks->lock($key, $this->leaseSeconds);
 
-                    return $callback();
-                });
+                if ($lock->block($this->waitSeconds) !== true) {
+                    throw new RuntimeException('The cache lock provider did not acquire the requested lock.');
+                }
+
+                $acquired[] = $lock;
+            }
+
+            $callbackStarted = true;
+            $result['value'] = $callback();
         } catch (Throwable $exception) {
+            $failure = $exception;
+        }
+
+        foreach (\array_reverse($acquired) as $lock) {
+            try {
+                if ($lock->release() === false) {
+                    $failure ??= new RuntimeException('A collision lock could not be released by its owner.');
+                }
+            } catch (Throwable $exception) {
+                $failure ??= $exception;
+            }
+        }
+
+        if ($failure instanceof Throwable) {
             if ($callbackStarted) {
-                throw $exception;
+                throw $failure;
             }
 
             throw new FileWriteFailed(
-                "The collision lock could not be acquired for disk [{$disk}].",
-                previous: $exception,
+                'One or more collision locks could not be acquired.',
+                previous: $failure,
             );
         }
+
+        if (\array_key_exists('value', $result) === false) {
+            throw new RuntimeException('The collision lock callback did not produce a result.');
+        }
+
+        return $result['value'];
     }
 
     /**

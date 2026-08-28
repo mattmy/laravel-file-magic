@@ -11,6 +11,7 @@ use Mattmy\FileMagic\Exceptions\FileRecordFailed;
 use Mattmy\FileMagic\Exceptions\FileWriteFailed;
 use Mattmy\FileMagic\Exceptions\PartialFileDeletion;
 use Mattmy\FileMagic\Models\StoredFile;
+use Mattmy\FileMagic\Support\CollisionLock;
 use Mattmy\FileMagic\Support\StoredFileModelResolver;
 use Throwable;
 
@@ -22,6 +23,7 @@ final readonly class DeleteFiles
     public function __construct(
         private FilesystemFactory $filesystems,
         private StoredFileModelResolver $models,
+        private CollisionLock $locks,
     ) {}
 
     /**
@@ -35,20 +37,62 @@ final readonly class DeleteFiles
             return 0;
         }
 
+        $snapshots = $this->snapshots($files);
+        [$filesystems, $filesystemFailures] = $this->resolveFilesystems($snapshots);
+
+        try {
+            return $this->locks->runMany(
+                \array_map(
+                    static fn (array $snapshot): array => [
+                        'disk' => $snapshot['disk'],
+                        'path' => $snapshot['path'],
+                    ],
+                    $snapshots,
+                ),
+                fn (): int => $this->executeLocked(
+                    $snapshots,
+                    $filesystems,
+                    $filesystemFailures,
+                ),
+            );
+        } catch (FileWriteFailed $exception) {
+            throw new PartialFileDeletion(
+                'The files could not be locked for deletion.',
+                0,
+                $this->modelKeys($files),
+                $exception,
+            );
+        }
+    }
+
+    /**
+     * Revalidate locked records and run the existing disk-batched deletion algorithm.
+     *
+     * @param  list<array{key: int|string, disk: string, path: string, location_hash: string, file: StoredFile}>  $snapshots
+     * @param  array<string, Filesystem>  $filesystems
+     * @param  array<string, Throwable>  $filesystemFailures
+     */
+    private function executeLocked(
+        array $snapshots,
+        array $filesystems,
+        array $filesystemFailures,
+    ): int {
+        [$files, $changed, $identityFailure] = $this->revalidate($snapshots);
         $confirmed = $this->emptyFileCollection();
-        $failed = $this->emptyFileCollection();
-        $firstFailure = null;
+        $failed = $changed;
+        $firstFailure = $identityFailure;
 
         foreach ($files->groupBy('disk') as $disk => $diskFiles) {
-            try {
-                $filesystem = $this->filesystems->disk((string) $disk);
-            } catch (Throwable $exception) {
+            $disk = (string) $disk;
+
+            if (isset($filesystemFailures[$disk])) {
                 $failed->push(...$diskFiles->all());
-                $firstFailure ??= $exception;
+                $firstFailure ??= $filesystemFailures[$disk];
 
                 continue;
             }
 
+            $filesystem = $filesystems[$disk];
             $failure = $this->deleteDiskFiles($filesystem, $diskFiles);
 
             if ($failure === null) {
@@ -73,6 +117,144 @@ final readonly class DeleteFiles
         }
 
         return $deletedCount;
+    }
+
+    /**
+     * Capture and validate immutable deletion identities before resolving external services.
+     *
+     * @param  Collection<int, StoredFile>  $files
+     * @return list<array{key: int|string, disk: string, path: string, location_hash: string, file: StoredFile}>
+     */
+    private function snapshots(Collection $files): array
+    {
+        return \array_values($files->map(function (StoredFile $file): array {
+            $key = $this->modelKey($file);
+            $disk = $file->getAttribute('disk');
+            $path = $file->getAttribute('path');
+            $locationHash = $file->getAttribute('location_hash');
+
+            if (
+                \is_string($disk) === false ||
+                $disk === '' ||
+                \is_string($path) === false ||
+                $path === '' ||
+                \is_string($locationHash) === false ||
+                $locationHash !== \hash('sha256', $disk . "\0" . $path)
+            ) {
+                throw new FileRecordFailed('A stored-file record has an invalid deletion identity.');
+            }
+
+            return [
+                'key' => $key,
+                'disk' => $disk,
+                'path' => $path,
+                'location_hash' => $locationHash,
+                'file' => $file,
+            ];
+        })->all());
+    }
+
+    /**
+     * Resolve every referenced disk before acquiring mutation locks.
+     *
+     * @param  list<array{key: int|string, disk: string, path: string, location_hash: string, file: StoredFile}>  $snapshots
+     * @return array{array<string, Filesystem>, array<string, Throwable>}
+     */
+    private function resolveFilesystems(array $snapshots): array
+    {
+        $filesystems = [];
+        $failures = [];
+
+        foreach ($snapshots as $snapshot) {
+            $disk = $snapshot['disk'];
+
+            if (isset($filesystems[$disk]) || isset($failures[$disk])) {
+                continue;
+            }
+
+            try {
+                $filesystems[$disk] = $this->filesystems->disk($disk);
+            } catch (Throwable $exception) {
+                $failures[$disk] = $exception;
+            }
+        }
+
+        return [$filesystems, $failures];
+    }
+
+    /**
+     * Reload locked identities and separate current, missing and changed records.
+     *
+     * @param  list<array{key: int|string, disk: string, path: string, location_hash: string, file: StoredFile}>  $snapshots
+     * @return array{Collection<int, StoredFile>, Collection<int, StoredFile>, ?Throwable}
+     */
+    private function revalidate(array $snapshots): array
+    {
+        $modelClass = $this->models->resolve();
+        $model = new $modelClass();
+        $keys = \array_column($snapshots, 'key');
+
+        try {
+            $current = $model->newQueryWithoutScopes()
+                ->whereKey($keys)
+                ->get([$model->getKeyName(), 'disk', 'path', 'location_hash']);
+        } catch (Throwable $exception) {
+            throw new FileRecordFailed(
+                'Stored-file records could not be revalidated before deletion.',
+                previous: $exception,
+            );
+        }
+
+        $byKey = [];
+
+        foreach ($current as $file) {
+            $byKey[$this->keyIdentity($file->getKey())] = $file;
+        }
+
+        $valid = $this->emptyFileCollection();
+        $changed = $this->emptyFileCollection();
+        $identityFailure = null;
+
+        foreach ($snapshots as $snapshot) {
+            $file = $byKey[$this->keyIdentity($snapshot['key'])] ?? null;
+
+            if ($file === null) {
+                continue;
+            }
+
+            if (
+                $file->getAttribute('disk') !== $snapshot['disk'] ||
+                $file->getAttribute('path') !== $snapshot['path'] ||
+                $file->getAttribute('location_hash') !== $snapshot['location_hash']
+            ) {
+                $changed->push($snapshot['file']);
+                $identityFailure ??= new FileRecordFailed(
+                    'A stored-file record changed while waiting for its deletion lock.',
+                );
+
+                continue;
+            }
+
+            $valid->push($file);
+        }
+
+        return [$valid, $changed, $identityFailure];
+    }
+
+    /**
+     * Preserve integer and string primary keys as distinct map identities.
+     */
+    private function keyIdentity(mixed $key): string
+    {
+        if (\is_int($key)) {
+            return "integer:{$key}";
+        }
+
+        if (\is_string($key) && $key !== '') {
+            return "string:{$key}";
+        }
+
+        throw new FileRecordFailed('A stored-file record has an unsupported primary key.');
     }
 
     /**
@@ -179,9 +361,23 @@ final readonly class DeleteFiles
     {
         return \array_values(
             $files
-                ->map(static fn (StoredFile $file): int|string => $file->getKey())
+                ->map(fn (StoredFile $file): int|string => $this->modelKey($file))
                 ->all(),
         );
+    }
+
+    /**
+     * Return a supported non-empty model key.
+     */
+    private function modelKey(StoredFile $file): int|string
+    {
+        $key = $file->getKey();
+
+        if (\is_int($key) || (\is_string($key) && $key !== '')) {
+            return $key;
+        }
+
+        throw new FileRecordFailed('A stored-file record has an unsupported primary key.');
     }
 
     /**

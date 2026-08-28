@@ -9,9 +9,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Enums\FileVisibility;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
+use Override;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -30,9 +32,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * @property string|null $owner_type
  * @property string|null $owner_id
  * @property array<array-key, mixed>|null $metadata
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Model|null $owner
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read Model|null $owner
+ *
  * @method static Builder<static>|StoredFile newModelQuery()
  * @method static Builder<static>|StoredFile newQuery()
  * @method static Builder<static>|StoredFile query()
@@ -53,6 +56,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * @method static Builder<static>|StoredFile whereUpdatedAt($value)
  * @method static Builder<static>|StoredFile whereUuid($value)
  * @method static Builder<static>|StoredFile whereVisibility($value)
+ *
  * @mixin \Eloquent
  */
 class StoredFile extends Model
@@ -187,6 +191,7 @@ class StoredFile extends Model
     /**
      * Delete the physical file before deleting its database record.
      */
+    #[Override]
     public function delete(): ?bool
     {
         if ($this->existsOnDisk() && $this->storage()->delete($this->path) === false) {
@@ -201,6 +206,7 @@ class StoredFile extends Model
      *
      * @return array<string, string>
      */
+    #[Override]
     protected function casts(): array
     {
         return [

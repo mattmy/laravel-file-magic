@@ -6,6 +6,7 @@ namespace Mattmy\FileMagic\Tests\Fixtures;
 
 use Illuminate\Database\Eloquent\Builder;
 use Mattmy\FileMagic\Models\StoredFile;
+use Override;
 
 final class TrackingStoredFile extends StoredFile
 {
@@ -23,6 +24,7 @@ final class TrackingStoredFile extends StoredFile
      *
      * @return Builder<static>
      */
+    #[Override]
     public function newQueryWithoutScopes(): Builder
     {
         self::$queriesWithoutScopes++;

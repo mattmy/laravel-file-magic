@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Mattmy\FileMagic\Actions\CreateZipDownload;
 use Mattmy\FileMagic\Actions\DeleteFiles;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
+use Mattmy\FileMagic\Exceptions\InvalidFileTarget;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Queries\FileFinder;
 use Mattmy\FileMagic\Support\FileMagicConfig;
@@ -63,9 +64,15 @@ final class FileQuery
     {
         return $this->resolve()
             ->filter(static fn (StoredFile $file): bool => $file->existsOnDisk())
-            ->mapWithKeys(static fn (StoredFile $file): array => [
-                $file->getKey() => $file->url(),
-            ])
+            ->mapWithKeys(static function (StoredFile $file): array {
+                $key = $file->getKey();
+
+                if (\is_int($key) === false && \is_string($key) === false) {
+                    throw new InvalidFileTarget('A stored file must have an integer or string primary key.');
+                }
+
+                return [$key => $file->url()];
+            })
             ->toBase();
     }
 

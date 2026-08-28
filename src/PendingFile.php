@@ -254,19 +254,31 @@ final class PendingFile
         return $this->maxSize;
     }
 
-    /** @return list<string>|null */
+    /**
+     * Return the configured MIME allowlist.
+     *
+     * @return list<string>|null
+     */
     public function allowedMimeTypes(): ?array
     {
         return $this->allowedMimeTypes;
     }
 
-    /** @return list<string>|null */
+    /**
+     * Return the configured MIME blocklist.
+     *
+     * @return list<string>|null
+     */
     public function blockedMimeTypes(): ?array
     {
         return $this->blockedMimeTypes;
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Return the configured metadata.
+     *
+     * @return array<string, mixed>
+     */
     public function metadata(): array
     {
         return $this->metadata;

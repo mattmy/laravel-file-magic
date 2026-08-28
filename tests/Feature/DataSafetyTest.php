@@ -48,7 +48,7 @@ it('rejects invalid model target identity before querying', function (): void {
     $wrongConnection->setConnection('other');
     $missingKey->setAttribute($missingKey->getKeyName(), null);
     \config()->set('database.connections.other', \config('database.connections.testing'));
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -104,7 +104,7 @@ it('deduplicates compatible subclasses across IDs UUIDs and supported containers
     $child = CompatibleStoredFile::query()->findOrFail($file->getKey());
     $queries = 0;
 
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -141,7 +141,7 @@ it('queries once for model-only compatible duplicates and keeps distinct records
     $child = CompatibleStoredFile::query()->findOrFail($first->getKey());
     $queries = 0;
 
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -187,13 +187,13 @@ it('uses canonical attributes for ZIP downloads from dirty model targets', funct
 
     $response = FileMagic::find($first)->downloadZip('canonical');
     $archivePath = $response->getFile()->getPathname();
-    $archive = new \ZipArchive();
+    $archive = new ZipArchive();
 
     expect($archive->open($archivePath))->toBeTrue()
         ->and($archive->getFromIndex(0))->toBe('first');
 
     $archive->close();
-    \unlink($archivePath);
+    (new Illuminate\Filesystem\Filesystem())->delete($archivePath);
 });
 
 it('ignores fabricated clean non-key attributes on model targets', function (): void {
@@ -220,7 +220,7 @@ it('rejects dirty primary keys before querying', function (): void {
     $queries = 0;
 
     $first->setAttribute($first->getKeyName(), $second->getKey());
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -252,7 +252,7 @@ it('resolves canonical model targets once per file query', function (): void {
     $queries = 0;
     $query = FileMagic::find($file);
 
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -268,7 +268,7 @@ it('rejects invalid mixed model targets before querying', function (): void {
     $queries = 0;
 
     $invalid->setTable('other_files');
-    \DB::listen(static function () use (&$queries): void {
+    DB::listen(static function () use (&$queries): void {
         $queries++;
     });
 
@@ -301,8 +301,8 @@ it('rejects an unsaved owner before storage begins', function (): void {
 });
 
 it('preserves record and cleanup failures when a newly written object cannot be deleted', function (): void {
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
     $this->app->instance(FilesystemFactory::class, $factory);
     \config()->set('file-magic.model', FailingStoredFile::class);
@@ -314,18 +314,18 @@ it('preserves record and cleanup failures when a newly written object cannot be 
     try {
         FileMagic::fromContent('contents')->named('new')->store();
     } catch (FileRecoveryFailed $exception) {
-        expect($exception->operationFailure())->toBeInstanceOf(\RuntimeException::class)
+        expect($exception->operationFailure())->toBeInstanceOf(RuntimeException::class)
             ->and($exception->getPrevious())->toBeInstanceOf(FileWriteFailed::class);
 
         return;
     }
 
-    throw new \RuntimeException('The cleanup failure was not thrown.');
+    throw new RuntimeException('The cleanup failure was not thrown.');
 });
 
 it('preserves record and cleanup failures when deleting a newly written object throws', function (): void {
-    $filesystem = \Mockery::mock(Filesystem::class);
-    $factory = \Mockery::mock(FilesystemFactory::class);
+    $filesystem = Mockery::mock(Filesystem::class);
+    $factory = Mockery::mock(FilesystemFactory::class);
 
     $this->app->instance(FilesystemFactory::class, $factory);
     \config()->set('file-magic.model', FailingStoredFile::class);
@@ -333,18 +333,18 @@ it('preserves record and cleanup failures when deleting a newly written object t
     $filesystem->shouldReceive('exists')->once()->with('files/new.txt')->andReturnFalse();
     $filesystem->shouldReceive('put')->once()->andReturnTrue();
     $filesystem->shouldReceive('delete')->once()->with('files/new.txt')
-        ->andThrow(new \RuntimeException('Simulated cleanup failure.'));
+        ->andThrow(new RuntimeException('Simulated cleanup failure.'));
 
     try {
         FileMagic::fromContent('contents')->named('new')->store();
     } catch (FileRecoveryFailed $exception) {
-        expect($exception->operationFailure())->toBeInstanceOf(\RuntimeException::class)
+        expect($exception->operationFailure())->toBeInstanceOf(RuntimeException::class)
             ->and($exception->getPrevious()?->getMessage())->toBe('Simulated cleanup failure.');
 
         return;
     }
 
-    throw new \RuntimeException('The cleanup failure was not thrown.');
+    throw new RuntimeException('The cleanup failure was not thrown.');
 });
 
 it('updates the existing overwrite record when its global scope hides it', function (): void {
