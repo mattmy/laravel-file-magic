@@ -6,6 +6,7 @@ namespace Mattmy\FileMagic\Sources;
 
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
+use Override;
 
 final readonly class ContentFileSource implements FileSource
 {
@@ -23,6 +24,7 @@ final readonly class ContentFileSource implements FileSource
      *
      * @return resource
      */
+    #[Override]
     public function openStream()
     {
         $stream = \fopen('php://temp', 'w+b');
@@ -39,6 +41,7 @@ final readonly class ContentFileSource implements FileSource
     /**
      * Return the optional original filename.
      */
+    #[Override]
     public function originalFilename(): ?string
     {
         return $this->originalFilename;
@@ -47,6 +50,7 @@ final readonly class ContentFileSource implements FileSource
     /**
      * Return the optional MIME type hint.
      */
+    #[Override]
     public function clientMimeType(): ?string
     {
         return $this->clientMimeType;

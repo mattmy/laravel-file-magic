@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Cache\Factory;
 use Illuminate\Contracts\Cache\Lock as LockContract;
 use Illuminate\Contracts\Cache\LockProvider;
+use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Storage;
@@ -26,9 +29,9 @@ beforeEach(function (): void {
 it('stores without resolving a cache lock when collision locking is disabled', function (array $lockConfig): void {
     config()->set('file-magic.collision_lock', $lockConfig);
 
-    $cache = Mockery::mock(\Illuminate\Contracts\Cache\Factory::class);
+    $cache = Mockery::mock(Factory::class);
     $cache->shouldNotReceive('store');
-    $this->app->instance(\Illuminate\Contracts\Cache\Factory::class, $cache);
+    $this->application()->instance(Factory::class, $cache);
 
     $file = FileMagic::fromContent('contents')->named('unlocked')->store();
 
@@ -63,17 +66,124 @@ it('rejects a non-boolean collision lock switch before materializing the source'
 
 it('preserves callback results and failures when collision locking is disabled', function (): void {
     config()->set('file-magic.collision_lock.enabled', false);
-    $cache = Mockery::mock(\Illuminate\Contracts\Cache\Factory::class);
+    $cache = Mockery::mock(Factory::class);
     $cache->shouldNotReceive('store');
     $locks = new CollisionLock($cache, app(FileMagicConfig::class));
 
     expect($locks->run('testing', 'files/result.txt', static fn (): string => 'result'))
         ->toBe('result')
+        ->and($locks->runMany([], static fn (): string => 'empty'))
+        ->toBe('empty')
         ->and(fn () => $locks->run(
             'testing',
             'files/failure.txt',
             static fn (): never => throw new RuntimeException('callback failed'),
         ))->toThrow(RuntimeException::class, 'callback failed');
+});
+
+it('acquires unique path locks in canonical order and releases them in reverse', function (): void {
+    $cache = Mockery::mock(Factory::class);
+    $repository = Mockery::mock(Repository::class);
+    $provider = Mockery::mock(LockProvider::class);
+    $events = [];
+    $locations = [
+        ['disk' => 'testing', 'path' => 'files/b.txt'],
+        ['disk' => 'testing', 'path' => 'files/a.txt'],
+        ['disk' => 'testing', 'path' => 'files/b.txt'],
+    ];
+    $keys = \array_values(\array_unique(\array_map(
+        static fn (array $location): string => 'file-magic:collision:'
+            . \hash('sha256', $location['disk'] . "\0" . $location['path']),
+        $locations,
+    )));
+    \sort($keys, SORT_STRING);
+    $locks = [];
+
+    foreach ($keys as $key) {
+        $lock = Mockery::mock(LockContract::class);
+        $lock->shouldReceive('block')->once()->with(1)->andReturnUsing(
+            function () use (&$events, $key): bool {
+                $events[] = "acquire:{$key}";
+
+                return true;
+            },
+        );
+        $lock->shouldReceive('release')->once()->andReturnUsing(
+            function () use (&$events, $key): bool {
+                $events[] = "release:{$key}";
+
+                return true;
+            },
+        );
+        $lock->shouldNotReceive('forceRelease');
+        $locks[$key] = $lock;
+    }
+
+    $cache->shouldReceive('store')->once()->with(null)->andReturn($repository);
+    $repository->shouldReceive('getStore')->once()->andReturn($provider);
+    $provider->shouldReceive('lock')
+        ->times(2)
+        ->andReturnUsing(function (string $key, int $seconds) use (&$events, $locks): LockContract {
+            expect($seconds)->toBe(300);
+            $events[] = "create:{$key}";
+
+            return $locks[$key];
+        });
+
+    $result = (new CollisionLock($cache, app(FileMagicConfig::class)))->runMany(
+        $locations,
+        function () use (&$events): string {
+            $events[] = 'callback';
+
+            return 'result';
+        },
+    );
+
+    expect($result)->toBe('result')
+        ->and($events)->toBe([
+            "create:{$keys[0]}",
+            "acquire:{$keys[0]}",
+            "create:{$keys[1]}",
+            "acquire:{$keys[1]}",
+            'callback',
+            "release:{$keys[1]}",
+            "release:{$keys[0]}",
+        ]);
+});
+
+it('releases acquired locks without running the callback when a later acquisition fails', function (): void {
+    $cache = Mockery::mock(Factory::class);
+    $repository = Mockery::mock(Repository::class);
+    $provider = Mockery::mock(LockProvider::class);
+    $first = Mockery::mock(LockContract::class);
+    $second = Mockery::mock(LockContract::class);
+    $callbackRan = false;
+
+    $cache->shouldReceive('store')->once()->with(null)->andReturn($repository);
+    $repository->shouldReceive('getStore')->once()->andReturn($provider);
+    $provider->shouldReceive('lock')->twice()->andReturn($first, $second);
+    $first->shouldReceive('block')->once()->with(1)->andReturnTrue();
+    $first->shouldReceive('release')->once()->andReturnTrue();
+    $first->shouldNotReceive('forceRelease');
+    $second->shouldReceive('block')->once()->with(1)->andThrow(new RuntimeException('unavailable'));
+    $second->shouldNotReceive('release');
+    $second->shouldNotReceive('forceRelease');
+
+    try {
+        (new CollisionLock($cache, app(FileMagicConfig::class)))->runMany(
+            [
+                ['disk' => 'testing', 'path' => 'files/first.txt'],
+                ['disk' => 'testing', 'path' => 'files/second.txt'],
+            ],
+            function () use (&$callbackRan): void {
+                $callbackRan = true;
+            },
+        );
+    } catch (FileWriteFailed $exception) {
+        expect($exception->getPrevious()?->getMessage())->toBe('unavailable');
+    }
+
+    expect($callbackRan)->toBeFalse();
 });
 
 it('serializes the same storage path and releases the lock after the callback', function (): void {
@@ -159,9 +269,9 @@ it('rejects unknown and no-op collision lock stores', function (string $store): 
 ]);
 
 it('rejects a cache store without atomic lock support', function (): void {
-    $cache = Mockery::mock(\Illuminate\Contracts\Cache\Factory::class);
-    $repository = Mockery::mock(\Illuminate\Contracts\Cache\Repository::class);
-    $store = Mockery::mock(\Illuminate\Contracts\Cache\Store::class);
+    $cache = Mockery::mock(Factory::class);
+    $repository = Mockery::mock(Repository::class);
+    $store = Mockery::mock(Store::class);
 
     $cache->shouldReceive('store')->once()->with(null)->andReturn($repository);
     $repository->shouldReceive('getStore')->once()->andReturn($store);
@@ -185,8 +295,8 @@ it('fails before storage when collision lock configuration is invalid', function
 });
 
 it('wraps acquisition failures and preserves callback failures', function (): void {
-    $cache = Mockery::mock(\Illuminate\Contracts\Cache\Factory::class);
-    $repository = Mockery::mock(\Illuminate\Contracts\Cache\Repository::class);
+    $cache = Mockery::mock(Factory::class);
+    $repository = Mockery::mock(Repository::class);
     $lockProvider = Mockery::mock(LockProvider::class);
     $lock = Mockery::mock(LockContract::class);
 
@@ -212,6 +322,12 @@ it('wraps acquisition failures and preserves callback failures', function (): vo
         'files/callback.txt',
         static fn (): never => throw new RuntimeException('callback failed'),
     ))->toThrow(RuntimeException::class, 'callback failed');
+
+    expect(app(CollisionLock::class)->run(
+        'testing',
+        'files/callback.txt',
+        static fn (): string => 'released',
+    ))->toBe('released');
 });
 
 it('applies error and overwrite policies after the previous writer releases the path', function (): void {
@@ -253,7 +369,7 @@ it('does not let a contending store inspect or mutate the path while a writer ho
     $contenderAttempted = false;
     $puts = 0;
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->twice()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->with('files/same.txt')->andReturnFalse();
     $filesystem->shouldReceive('put')
@@ -283,7 +399,6 @@ it('does not let a contending store inspect or mutate the path while a writer ho
     $winner = FileMagic::fromContent('winner')->named('same')->store();
 
     expect($contenderFailed)->toBeTrue()
-        ->and($winner)->toBeInstanceOf(StoredFile::class)
         ->and(StoredFile::query()->count())->toBe(1)
         ->and($puts)->toBe(1);
 });
@@ -314,7 +429,7 @@ it('locks a generated suffix against an explicit request for that path', functio
     $factory = Mockery::mock(FilesystemFactory::class);
     $contenderFailed = false;
 
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->twice()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->ordered()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('exists')
@@ -353,39 +468,46 @@ it('locks a generated suffix against an explicit request for that path', functio
 });
 
 it('keeps the path lock until overwrite recovery and backup cleanup finish', function (): void {
-    $cache = Mockery::mock(\Illuminate\Contracts\Cache\Factory::class);
-    $repository = Mockery::mock(\Illuminate\Contracts\Cache\Repository::class);
+    $cache = Mockery::mock(Factory::class);
+    $repository = Mockery::mock(Repository::class);
     $lockProvider = Mockery::mock(LockProvider::class);
     $lock = Mockery::mock(LockContract::class);
     $filesystem = Mockery::mock(Filesystem::class);
     $factory = Mockery::mock(FilesystemFactory::class);
-    $restoredStream = null;
+    $backupStream = new class()
+    {
+        public mixed $value = null;
+    };
     $events = [];
     $expectedKey = 'file-magic:collision:' . \hash('sha256', "testing\0files/same.txt");
+    $backupStreamIsOpen = static fn (): bool => \is_resource($backupStream->value);
 
     $cache->shouldReceive('store')->once()->with(null)->andReturn($repository);
     $repository->shouldReceive('getStore')->once()->andReturn($lockProvider);
     $lockProvider->shouldReceive('lock')->once()->with($expectedKey, 300)->andReturn($lock);
     $lock->shouldReceive('block')
         ->once()
-        ->withArgs(static fn (int $wait, mixed $callback): bool => $wait === 1 && \is_callable($callback))
-        ->andReturnUsing(function (int $wait, callable $callback) use (&$events, &$restoredStream): mixed {
+        ->with(1)
+        ->andReturnUsing(function () use (&$events): bool {
             $events[] = 'lock acquired';
 
-            try {
-                return $callback();
-            } finally {
-                $events[] = \is_resource($restoredStream)
-                    ? 'lock released before backup close'
-                    : 'lock released after backup close';
-            }
+            return true;
+        });
+    $lock->shouldReceive('release')
+        ->once()
+        ->andReturnUsing(function () use (&$events, $backupStreamIsOpen): bool {
+            $events[] = $backupStreamIsOpen()
+                ? 'lock released before backup close'
+                : 'lock released after backup close';
+
+            return true;
         });
 
-    $this->app->instance(CollisionLock::class, new CollisionLock(
+    $this->application()->instance(CollisionLock::class, new CollisionLock(
         $cache,
         app(FileMagicConfig::class),
     ));
-    $this->app->instance(FilesystemFactory::class, $factory);
+    $this->application()->instance(FilesystemFactory::class, $factory);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/same.txt')->andReturnTrue();
     $filesystem->shouldReceive('getVisibility')->once()->with('files/same.txt')->andReturn('private');
@@ -396,8 +518,8 @@ it('keeps the path lock until overwrite recovery and backup cleanup finish', fun
     $filesystem->shouldReceive('put')
         ->once()
         ->ordered()
-        ->withArgs(function (string $path, mixed $stream, array $options) use (&$restoredStream, &$events): bool {
-            $restoredStream = $stream;
+        ->withArgs(function (string $path, mixed $stream, array $options) use ($backupStream, &$events): bool {
+            $backupStream->value = $stream;
             $events[] = 'backup restored';
 
             return $path === 'files/same.txt' && $options === ['visibility' => 'private'];
@@ -437,9 +559,17 @@ final class CollisionCountingSource implements FileSource
 {
     public int $openedStreams = 0;
 
+    /**
+     * Create a source that records stream openings.
+     */
     public function __construct(private readonly string $contents) {}
 
-    /** @return resource */
+    /**
+     * Open a fresh stream and record the call.
+     *
+     * @return resource
+     */
+    #[Override]
     public function openStream()
     {
         $this->openedStreams++;
@@ -447,11 +577,19 @@ final class CollisionCountingSource implements FileSource
         return (new ContentFileSource($this->contents))->openStream();
     }
 
+    /**
+     * Return no original filename.
+     */
+    #[Override]
     public function originalFilename(): ?string
     {
         return null;
     }
 
+    /**
+     * Return no client MIME hint.
+     */
+    #[Override]
     public function clientMimeType(): ?string
     {
         return null;

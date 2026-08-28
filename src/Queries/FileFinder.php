@@ -22,7 +22,7 @@ final readonly class FileFinder
     /**
      * Resolve file targets while preserving input order and removing duplicates.
      *
-     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, int|string|StoredFile>>  $targets
+     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, covariant int|string|StoredFile>>  $targets
      * @return EloquentCollection<int, StoredFile>
      */
     public function find(array $targets): EloquentCollection
@@ -30,7 +30,7 @@ final readonly class FileFinder
         $normalizedTargets = $this->normalize($targets);
         $storedFiles = $this->fetchStoredFiles($normalizedTargets);
         $filesById = $storedFiles->keyBy(
-            static fn (StoredFile $file): string => (string) $file->getKey(),
+            fn (StoredFile $file): string => (string) $this->modelKey($file),
         );
         $filesByUuid = $storedFiles->keyBy('uuid');
         $resolvedFiles = new EloquentCollection();
@@ -38,7 +38,7 @@ final readonly class FileFinder
 
         foreach ($normalizedTargets as $target) {
             $file = match (true) {
-                $target instanceof StoredFile => $filesById->get((string) $target->getKey()),
+                $target instanceof StoredFile => $filesById->get((string) $this->modelKey($target)),
                 \is_int($target) => $filesById->get((string) $target),
                 default => $filesByUuid->get($target),
             };
@@ -47,7 +47,7 @@ final readonly class FileFinder
                 continue;
             }
 
-            $key = (string) $file->getKey();
+            $key = (string) $this->modelKey($file);
 
             if (\array_key_exists($key, $resolvedKeys)) {
                 continue;
@@ -63,7 +63,7 @@ final readonly class FileFinder
     /**
      * Normalize variadic, array and Collection targets into one strict list.
      *
-     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, int|string|StoredFile>>  $targets
+     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, covariant int|string|StoredFile>>  $targets
      * @return list<int|string|StoredFile>
      */
     private function normalize(array $targets): array
@@ -120,7 +120,7 @@ final readonly class FileFinder
             if (\is_int($target)) {
                 $ids[] = $target;
             } elseif ($target instanceof StoredFile) {
-                $ids[] = $target->getKey();
+                $ids[] = $this->modelKey($target);
             } elseif (\is_string($target)) {
                 $uuids[] = $target;
             }
@@ -145,5 +145,19 @@ final readonly class FileFinder
                 }
             })
             ->get();
+    }
+
+    /**
+     * Return one validated Eloquent primary key.
+     */
+    private function modelKey(StoredFile $file): int|string
+    {
+        $key = $file->getKey();
+
+        if (\is_int($key) || (\is_string($key) && $key !== '')) {
+            return $key;
+        }
+
+        throw new InvalidFileTarget('A stored file must have a non-empty integer or string primary key.');
     }
 }

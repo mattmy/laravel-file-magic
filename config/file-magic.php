@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use Mattmy\FileMagic\Models\StoredFile;
 
 return [
     'disk' => \env('FILE_MAGIC_DISK', \env('FILESYSTEM_DISK', 'local')),
@@ -21,7 +22,7 @@ return [
     ],
     'checksum_algorithm' => 'sha256',
     'temporary_url_ttl' => 5,
-    'model' => Mattmy\FileMagic\Models\StoredFile::class,
+    'model' => StoredFile::class,
     'table' => 'stored_files',
     'image' => [
         'quality' => 80,

@@ -11,6 +11,7 @@ use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Collection;
 use InvalidArgumentException;
 use Mattmy\FileMagic\Models\StoredFile;
+use Mattmy\FileMagic\Support\CollisionLock;
 use Mattmy\FileMagic\Support\StoredFileModelResolver;
 use RuntimeException;
 use Symfony\Component\Console\Input\InputOption;
@@ -52,6 +53,7 @@ final class AuditFilesCommand extends Command
         private readonly Config $config,
         private readonly FilesystemFactory $filesystems,
         private readonly StoredFileModelResolver $models,
+        private readonly CollisionLock $locks,
     ) {
         parent::__construct();
 
@@ -235,8 +237,13 @@ final class AuditFilesCommand extends Command
         $model = new $modelClass();
         $keyName = $model->getKeyName();
         $qualifiedKeyName = $model->qualifyColumn($keyName);
-        $query = $model->newQueryWithoutScopes()
-            ->select([$keyName, 'disk', 'path']);
+        $columns = [$keyName, 'disk', 'path'];
+
+        if ($deleteMissingRecords) {
+            $columns[] = 'location_hash';
+        }
+
+        $query = $model->newQueryWithoutScopes()->select($columns);
 
         if ($disk !== null) {
             $query->where('disk', $disk);
@@ -260,36 +267,55 @@ final class AuditFilesCommand extends Command
         StoredFile $model,
         bool $deleteMissingRecords,
     ): bool {
-        $missingKeys = [];
+        $missingCandidates = [];
 
         foreach ($files as $file) {
-            $missingKey = $this->auditFile($file);
+            $missingCandidate = $this->auditFile($file, $deleteMissingRecords);
 
-            if ($missingKey !== null) {
-                $missingKeys[] = $missingKey;
+            if ($missingCandidate !== null) {
+                $missingCandidates[] = $missingCandidate;
             }
         }
 
-        if ($deleteMissingRecords && $missingKeys !== []) {
-            $this->deleteMissingRecords($model, $missingKeys);
+        if ($missingCandidates !== []) {
+            $this->cleanMissingRecords($model, $missingCandidates);
         }
 
         return true;
     }
 
     /**
-     * Check one record exactly once and return its key only when the object is missing.
+     * Check one record and defer missing-state finalization when cleanup is enabled.
+     *
+     * @return array{key: int|string, disk: string, path: string, location_hash: string}|null
      */
-    private function auditFile(StoredFile $file): int|string|null
+    private function auditFile(StoredFile $file, bool $deleteMissingRecords): ?array
     {
         $this->checked++;
         $key = $this->modelKey($file);
         $disk = $file->getAttribute('disk');
         $path = $file->getAttribute('path');
+        $locationHash = $file->getAttribute('location_hash');
 
-        if (\is_string($disk) === false || $disk === '' || \is_string($path) === false || $path === '') {
+        if (
+            \is_string($disk) === false ||
+            $disk === '' ||
+            \is_string($path) === false ||
+            $path === ''
+        ) {
             $this->failed++;
             $this->writeUnknown($key);
+
+            return null;
+        }
+
+        if (
+            $deleteMissingRecords &&
+            (\is_string($locationHash) === false ||
+                $locationHash !== \hash('sha256', $disk . "\0" . $path))
+        ) {
+            $this->failed++;
+            $this->writeUnknown($key, $disk, $path);
 
             return null;
         }
@@ -309,10 +335,19 @@ final class AuditFilesCommand extends Command
             return null;
         }
 
+        if ($deleteMissingRecords) {
+            return [
+                'key' => $key,
+                'disk' => $disk,
+                'path' => $path,
+                'location_hash' => $locationHash,
+            ];
+        }
+
         $this->missing++;
         $this->writeMissing($key, $disk, $path);
 
-        return $key;
+        return null;
     }
 
     /**
@@ -338,15 +373,93 @@ final class AuditFilesCommand extends Command
     }
 
     /**
-     * Bulk-delete one chunk of confirmed missing records and verify affected rows.
+     * Revalidate initial missing candidates while holding their canonical path locks.
      *
-     * @param  list<int|string>  $keys
+     * @param  list<array{key: int|string, disk: string, path: string, location_hash: string}>  $candidates
      */
-    private function deleteMissingRecords(StoredFile $model, array $keys): void
+    private function cleanMissingRecords(StoredFile $model, array $candidates): void
     {
+        $this->locks->runMany(
+            \array_map(
+                static fn (array $candidate): array => [
+                    'disk' => $candidate['disk'],
+                    'path' => $candidate['path'],
+                ],
+                $candidates,
+            ),
+            fn (): int => $this->cleanMissingRecordsWhileLocked($model, $candidates),
+        );
+    }
+
+    /**
+     * Reload locked identities, recheck storage and delete only records still missing.
+     *
+     * @param  list<array{key: int|string, disk: string, path: string, location_hash: string}>  $candidates
+     */
+    private function cleanMissingRecordsWhileLocked(StoredFile $model, array $candidates): int
+    {
+        $current = $model->newQueryWithoutScopes()
+            ->whereKey(\array_column($candidates, 'key'))
+            ->get([$model->getKeyName(), 'disk', 'path', 'location_hash']);
+        $byKey = [];
+
+        foreach ($current as $file) {
+            $byKey[$this->keyIdentity($this->modelKey($file))] = $file;
+        }
+
+        $keys = [];
+
+        foreach ($candidates as $candidate) {
+            $file = $byKey[$this->keyIdentity($candidate['key'])] ?? null;
+
+            if ($file === null) {
+                continue;
+            }
+
+            if (
+                $file->getAttribute('disk') !== $candidate['disk'] ||
+                $file->getAttribute('path') !== $candidate['path'] ||
+                $file->getAttribute('location_hash') !== $candidate['location_hash']
+            ) {
+                $this->failed++;
+                $this->writeUnknown($candidate['key'], $candidate['disk'], $candidate['path']);
+
+                continue;
+            }
+
+            try {
+                $exists = $this->filesystem($candidate['disk'])->exists($candidate['path']);
+            } catch (Throwable) {
+                $this->failed++;
+                $this->writeUnknown($candidate['key'], $candidate['disk'], $candidate['path']);
+
+                continue;
+            }
+
+            if ($exists) {
+                $this->healthy++;
+
+                continue;
+            }
+
+            $this->missing++;
+            $this->writeMissing($candidate['key'], $candidate['disk'], $candidate['path']);
+            $keys[] = $candidate['key'];
+        }
+
+        if ($keys === []) {
+            return 0;
+        }
+
         $deleted = $model->newQueryWithoutScopes()
             ->whereKey($keys)
             ->delete();
+
+        if (\is_int($deleted) === false) {
+            throw new RuntimeException('The database returned an invalid deleted-record count.');
+        }
+
+        $this->deleted += $deleted;
 
         if ($deleted !== \count($keys)) {
             throw new RuntimeException(
@@ -354,7 +467,17 @@ final class AuditFilesCommand extends Command
             );
         }
 
-        $this->deleted += $deleted;
+        return $deleted;
+    }
+
+    /**
+     * Preserve integer and string primary keys as distinct map identities.
+     */
+    private function keyIdentity(int|string $key): string
+    {
+        return \is_int($key)
+            ? "integer:{$key}"
+            : "string:{$key}";
     }
 
     /**

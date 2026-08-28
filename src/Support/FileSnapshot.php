@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Mattmy\FileMagic\Support;
 
+use Illuminate\Filesystem\Filesystem;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Contracts\ReleasableFileSource;
 use Mattmy\FileMagic\Data\FileMetadata;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
+use Override;
 
 final class FileSnapshot implements FileSource, ReleasableFileSource
 {
@@ -38,6 +40,7 @@ final class FileSnapshot implements FileSource, ReleasableFileSource
      *
      * @return resource
      */
+    #[Override]
     public function openStream()
     {
         $path = $this->path;
@@ -58,6 +61,7 @@ final class FileSnapshot implements FileSource, ReleasableFileSource
     /**
      * Return the original filename fixed at capture time.
      */
+    #[Override]
     public function originalFilename(): ?string
     {
         return $this->originalFilename;
@@ -66,6 +70,7 @@ final class FileSnapshot implements FileSource, ReleasableFileSource
     /**
      * Return the client MIME hint fixed at capture time.
      */
+    #[Override]
     public function clientMimeType(): ?string
     {
         return $this->clientMimeType;
@@ -74,6 +79,7 @@ final class FileSnapshot implements FileSource, ReleasableFileSource
     /**
      * Release the temporary file owned by this snapshot.
      */
+    #[Override]
     public function release(): void
     {
         $path = $this->path;
@@ -82,7 +88,8 @@ final class FileSnapshot implements FileSource, ReleasableFileSource
             return;
         }
 
-        $this->path = null;
-        @\unlink($path);
+        if ((new Filesystem())->delete($path)) {
+            $this->path = null;
+        }
     }
 }

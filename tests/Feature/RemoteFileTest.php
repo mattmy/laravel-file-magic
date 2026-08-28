@@ -27,7 +27,7 @@ beforeEach(function (): void {
         'private.example.com' => ['127.0.0.1'],
         'mixed.example.com' => ['93.184.216.34', '100.64.0.1'],
     ]);
-    $this->app->instance(HostResolver::class, $this->hostResolver);
+    $this->application()->instance(HostResolver::class, $this->hostResolver);
 });
 
 it('rejects non-global IPv4 addresses', function (string $address): void {
@@ -107,7 +107,7 @@ it('allows ordinary public IPv6 addresses', function (): void {
 });
 
 it('canonicalizes a trailing-dot hostname before resolving and pinning it', function (): void {
-    $endpoint = $this->app->make(RemoteUrlGuard::class)->validate(
+    $endpoint = $this->application()->make(RemoteUrlGuard::class)->validate(
         'https://DOWNLOADS.EXAMPLE.COM.:8443/file.pdf?token=value',
         new RemoteFileOptions(allowedPorts: [8443]),
     );

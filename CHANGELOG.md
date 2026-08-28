@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file. FileMagic
 follows [Semantic Versioning](https://semver.org/) and the structure of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+## [0.5.0] - 2026-08-28
+
+### Fixed
+
+- Coordinate stores, batch deletion, and audit cleanup with the same canonical
+  path locks, revalidating database identity before destructive mutations.
+- Align package-owned PHP code and quality-tool configuration with the shared
+  PHP 8.3 coding standard.
+
 ## [0.4.0] - 2026-08-21
 
 ### Fixed

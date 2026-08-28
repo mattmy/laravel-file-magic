@@ -1,10 +1,15 @@
 includes:
     - vendor/larastan/larastan/extension.neon
+    - vendor/pestphp/pest/extension.neon
+    - vendor/pestphp/pest/phpstan-pest-extension.neon
+    - vendor/mrpunyapal/peststan/extension.neon
+    - vendor/phpstan/phpstan-mockery/extension.neon
 
 parameters:
-    level: 8
+    level: max
     paths:
         - src
+        - tests
     bootstrapFiles:
         - vendor/larastan/larastan/bootstrap.php
     parallel:

@@ -117,7 +117,7 @@ final class FileMagic
     /**
      * Begin a query for IDs, UUIDs, stored file models, arrays or Collections.
      *
-     * @param  int|string|StoredFile|array<array-key, int|string|StoredFile>|SupportCollection<array-key, int|string|StoredFile>  ...$targets
+     * @param  int|string|StoredFile|array<array-key, int|string|StoredFile>|SupportCollection<array-key, covariant int|string|StoredFile>  ...$targets
      */
     public function find(int|string|StoredFile|array|SupportCollection ...$targets): FileQuery
     {

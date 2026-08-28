@@ -6,6 +6,7 @@ namespace Mattmy\FileMagic\Sources;
 
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
+use Override;
 
 final readonly class PathFileSource implements FileSource
 {
@@ -24,6 +25,7 @@ final readonly class PathFileSource implements FileSource
      *
      * @return resource
      */
+    #[Override]
     public function openStream()
     {
         $stream = \fopen($this->path, 'rb');
@@ -38,6 +40,7 @@ final readonly class PathFileSource implements FileSource
     /**
      * Return the basename of the source path.
      */
+    #[Override]
     public function originalFilename(): string
     {
         return \basename($this->path);
@@ -46,6 +49,7 @@ final readonly class PathFileSource implements FileSource
     /**
      * A local path has no client-provided MIME type.
      */
+    #[Override]
     public function clientMimeType(): null
     {
         return null;

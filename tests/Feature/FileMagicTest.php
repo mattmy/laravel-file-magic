@@ -22,9 +22,8 @@ it('stores and reads an uploaded file', function (): void {
         UploadedFile::fake()->createWithContent('manual.txt', 'package test'),
     )->named('manual')->store();
 
-    expect($file)
-        ->toBeInstanceOf(StoredFile::class)
-        ->contents()->toBe('package test')
+    expect($file->contents())
+        ->toBe('package test')
         ->and($file->mime_type)->toBe('text/plain')
         ->and($file->location_hash)->toBe(\hash('sha256', "testing\0files/manual.txt"));
 
@@ -46,8 +45,11 @@ it('resizes an image with Intervention Image 4', function (): void {
         ->store();
     $size = \getimagesizefromstring($file->contents());
 
+    if ($size === false) {
+        throw new RuntimeException('The image fixture could not be inspected.');
+    }
+
     expect($file->mime_type)->toBe('image/png')
-        ->and($size)->toBeArray()
         ->and($size[0])->toBe(1)
         ->and($size[1])->toBe(1);
 });

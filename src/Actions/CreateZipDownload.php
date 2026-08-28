@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic\Actions;
 
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Filesystem\Filesystem;
 use Mattmy\FileMagic\Exceptions\FileMagicException;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
 use Mattmy\FileMagic\Exceptions\ZipCreationFailed;
@@ -283,10 +284,10 @@ final readonly class CreateZipDownload
      */
     private function deleteTemporaryFiles(array $paths): void
     {
+        $filesystem = new Filesystem();
+
         foreach ($paths as $path) {
-            if (\is_file($path)) {
-                \unlink($path);
-            }
+            $filesystem->delete($path);
         }
     }
 }

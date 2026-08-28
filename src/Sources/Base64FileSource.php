@@ -9,6 +9,7 @@ use Mattmy\FileMagic\Contracts\SizeLimitedFileSource;
 use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\InvalidBase64;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
+use Override;
 
 final class Base64FileSource implements FileSource, SizeLimitedFileSource
 {
@@ -51,6 +52,7 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
     /**
      * Apply the maximum decoded byte limit before materialization.
      */
+    #[Override]
     public function limitSize(int $bytes): void
     {
         $this->maximumBytes = $bytes;
@@ -65,6 +67,7 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
      *
      * @return resource
      */
+    #[Override]
     public function openStream()
     {
         if ($this->maximumBytes === null) {
@@ -114,6 +117,7 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
     /**
      * Return the optional original filename.
      */
+    #[Override]
     public function originalFilename(): ?string
     {
         return $this->originalFilename;
@@ -122,6 +126,7 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
     /**
      * Return the MIME type declared by a Data URI.
      */
+    #[Override]
     public function clientMimeType(): ?string
     {
         return $this->mimeType;

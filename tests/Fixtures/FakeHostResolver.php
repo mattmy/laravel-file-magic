@@ -6,6 +6,7 @@ namespace Mattmy\FileMagic\Tests\Fixtures;
 
 use Mattmy\FileMagic\Contracts\HostResolver;
 use Mattmy\FileMagic\Exceptions\RemoteDownloadFailed;
+use Override;
 
 final class FakeHostResolver implements HostResolver
 {
@@ -24,6 +25,7 @@ final class FakeHostResolver implements HostResolver
      *
      * @return non-empty-list<string>
      */
+    #[Override]
     public function resolve(string $host): array
     {
         $this->resolvedHosts[] = $host;
