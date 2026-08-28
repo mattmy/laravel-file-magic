@@ -52,7 +52,7 @@ it('rejects invalid model target identity before querying', function (): void {
         $queries++;
     });
 
-    foreach ([new StoredFile, $wrongKey, $wrongTable, $wrongConnection, $missingKey] as $target) {
+    foreach ([new StoredFile(), $wrongKey, $wrongTable, $wrongConnection, $missingKey] as $target) {
         expect(static fn () => FileMagic::find($target)->one())
             ->toThrow(InvalidFileTarget::class);
     }
@@ -188,18 +188,18 @@ it('uses canonical attributes for ZIP downloads from dirty model targets', funct
 
     $response = FileMagic::find($first)->downloadZip('canonical');
     $archivePath = $response->getFile()->getPathname();
-    $archive = new ZipArchive;
+    $archive = new ZipArchive();
 
     expect($archive->open($archivePath))->toBeTrue()
         ->and($archive->getFromIndex(0))->toBe('first');
 
     $archive->close();
-    (new Illuminate\Filesystem\Filesystem)->delete($archivePath);
+    (new Illuminate\Filesystem\Filesystem())->delete($archivePath);
 });
 
 it('ignores fabricated clean non-key attributes on model targets', function (): void {
     $file = FileMagic::fromContent('contents')->named('original')->store();
-    $fabricated = new StoredFile;
+    $fabricated = new StoredFile();
 
     $fabricated->setRawAttributes([
         'id' => $file->getKey(),
@@ -239,7 +239,7 @@ it('skips stale and scoped-out model targets', function (): void {
     expect(FileMagic::find($stale)->get())->toBeEmpty();
 
     $scoped = FileMagic::fromContent('scoped')->store();
-    $selector = new GloballyScopedStoredFile;
+    $selector = new GloballyScopedStoredFile();
 
     $selector->setRawAttributes($scoped->getAttributes(), true);
     $selector->exists = true;
@@ -289,8 +289,8 @@ it('deletes a same-row compatible subclass target only once', function (): void 
 });
 
 it('rejects an unsaved owner before storage begins', function (): void {
-    $owner = new class extends Model {};
-    $ownerWithoutKey = new class extends Model
+    $owner = new class() extends Model {};
+    $ownerWithoutKey = new class() extends Model
     {
         public $exists = true;
     };

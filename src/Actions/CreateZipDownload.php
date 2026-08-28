@@ -50,7 +50,7 @@ final readonly class CreateZipDownload
 
         $archivePath = $this->temporaryFile();
         $entryPaths = [];
-        $archive = new ZipArchive;
+        $archive = new ZipArchive();
         $archiveOpened = false;
         $preserveArchive = false;
 
@@ -284,7 +284,7 @@ final readonly class CreateZipDownload
      */
     private function deleteTemporaryFiles(array $paths): void
     {
-        $filesystem = new Filesystem;
+        $filesystem = new Filesystem();
 
         foreach ($paths as $path) {
             $filesystem->delete($path);

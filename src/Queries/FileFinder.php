@@ -33,7 +33,7 @@ final readonly class FileFinder
             fn (StoredFile $file): string => (string) $this->modelKey($file),
         );
         $filesByUuid = $storedFiles->keyBy('uuid');
-        $resolvedFiles = new EloquentCollection;
+        $resolvedFiles = new EloquentCollection();
         $resolvedKeys = [];
 
         foreach ($normalizedTargets as $target) {
@@ -127,11 +127,11 @@ final readonly class FileFinder
         }
 
         if ($ids === [] && $uuids === []) {
-            return new EloquentCollection;
+            return new EloquentCollection();
         }
 
         $modelClass = $this->models->resolve();
-        $keyName = (new $modelClass)->getKeyName();
+        $keyName = (new $modelClass())->getKeyName();
 
         return $modelClass::query()
             ->where(function (Builder $query) use ($ids, $keyName, $uuids): void {

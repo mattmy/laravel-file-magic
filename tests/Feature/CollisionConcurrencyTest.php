@@ -93,7 +93,7 @@ it('acquires unique path locks in canonical order and releases them in reverse',
     ];
     $keys = \array_values(\array_unique(\array_map(
         static fn (array $location): string => 'file-magic:collision:'
-            .\hash('sha256', $location['disk']."\0".$location['path']),
+            . \hash('sha256', $location['disk'] . "\0" . $location['path']),
         $locations,
     )));
     \sort($keys, SORT_STRING);
@@ -474,12 +474,12 @@ it('keeps the path lock until overwrite recovery and backup cleanup finish', fun
     $lock = Mockery::mock(LockContract::class);
     $filesystem = Mockery::mock(Filesystem::class);
     $factory = Mockery::mock(FilesystemFactory::class);
-    $backupStream = new class
+    $backupStream = new class()
     {
         public mixed $value = null;
     };
     $events = [];
-    $expectedKey = 'file-magic:collision:'.\hash('sha256', "testing\0files/same.txt");
+    $expectedKey = 'file-magic:collision:' . \hash('sha256', "testing\0files/same.txt");
     $backupStreamIsOpen = static fn (): bool => \is_resource($backupStream->value);
 
     $cache->shouldReceive('store')->once()->with(null)->andReturn($repository);

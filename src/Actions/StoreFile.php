@@ -71,7 +71,7 @@ final readonly class StoreFile
         $blockedMimeTypes = $pending->blockedMimeTypes() ?? $this->fileMagicConfig->blockedMimeTypes();
         $checksumAlgorithm = $this->fileMagicConfig->checksumAlgorithm();
         $modelClass = $this->models->resolve();
-        $model = new $modelClass;
+        $model = new $modelClass();
         $source = $pending->source();
         $disk = $this->resolveDisk($diskName, $configuredDisk ? 'file-magic.disk' : 'onDisk');
 
@@ -347,7 +347,7 @@ final readonly class StoreFile
         $basename = \pathinfo($path, PATHINFO_FILENAME);
         $directory = \pathinfo($path, PATHINFO_DIRNAME);
 
-        $uniqueName = "{$basename}-".Str::lower(Str::random(12)).".{$extension}";
+        $uniqueName = "{$basename}-" . Str::lower(Str::random(12)) . ".{$extension}";
 
         return $directory === '.' ? $uniqueName : "{$directory}/{$uniqueName}";
     }
@@ -421,7 +421,7 @@ final readonly class StoreFile
      */
     private function locationHash(string $disk, string $path): string
     {
-        return \hash(self::LOCATION_HASH_ALGORITHM, $disk."\0".$path);
+        return \hash(self::LOCATION_HASH_ALGORITHM, $disk . "\0" . $path);
     }
 
     /**

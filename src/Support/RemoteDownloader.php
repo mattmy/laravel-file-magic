@@ -52,7 +52,7 @@ final readonly class RemoteDownloader
         try {
             return $this->follow($url, $path, $options, $maximumBytes);
         } catch (Throwable $exception) {
-            (new Filesystem)->delete($path);
+            (new Filesystem())->delete($path);
 
             if ($exception instanceof FileMagicException) {
                 throw $exception;

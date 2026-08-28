@@ -63,7 +63,7 @@ it('stores a path snapshot when the original path changes before storage reads i
             ->and($file->size)->toBe(22)
             ->and($file->checksum)->toBe(\hash('sha256', 'captured path contents'));
     } finally {
-        (new Illuminate\Filesystem\Filesystem)->delete($path);
+        (new Illuminate\Filesystem\Filesystem())->delete($path);
     }
 });
 
@@ -114,7 +114,7 @@ it('processes images from a captured source without reopening the original', fun
 });
 
 it('opens independent snapshot readers and releases its temporary resource safely', function (): void {
-    $snapshot = (new FileInspector)->capture(
+    $snapshot = (new FileInspector())->capture(
         new ContentFileSource('snapshot contents', 'snapshot.txt'),
         'sha256',
         100,

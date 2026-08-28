@@ -171,7 +171,7 @@ it('rejects oversized Base64 before decoding or mutating storage', function (str
     Storage::disk('testing')->assertDirectoryEmpty('/');
 })->with([
     'plain Base64' => [\base64_encode('123456')],
-    'data URI' => ['data:text/plain;base64,'.\base64_encode('123456')],
+    'data URI' => ['data:text/plain;base64,' . \base64_encode('123456')],
 ]);
 
 it('rejects invalid paths before Base64 decoding', function (Closure $configure, string $exception): void {
@@ -404,7 +404,7 @@ it('validates remote defaults only when they are used', function (): void {
         ->toThrow(InvalidConfiguration::class);
     FileMagic::fromContent('contents')->store();
 
-    expect(FileMagic::fromUrl('https://example.com/file.txt', new RemoteFileOptions)->source())
+    expect(FileMagic::fromUrl('https://example.com/file.txt', new RemoteFileOptions())->source())
         ->toBeInstanceOf(RemoteFileSource::class);
 });
 
@@ -544,7 +544,7 @@ function inputHardeningPng(int $width, int $height): string
     $rows = '';
 
     for ($offset = 0; $offset < \strlen($pixels); $offset += $width * 3) {
-        $rows .= "\0".\substr($pixels, $offset, $width * 3);
+        $rows .= "\0" . \substr($pixels, $offset, $width * 3);
     }
 
     $compressed = \gzcompress($rows);
@@ -554,9 +554,9 @@ function inputHardeningPng(int $width, int $height): string
     }
 
     return "\x89PNG\r\n\x1a\n"
-        .inputHardeningPngChunk('IHDR', \pack('NNCCCCC', $width, $height, 8, 2, 0, 0, 0))
-        .inputHardeningPngChunk('IDAT', $compressed)
-        .inputHardeningPngChunk('IEND', '');
+        . inputHardeningPngChunk('IHDR', \pack('NNCCCCC', $width, $height, 8, 2, 0, 0, 0))
+        . inputHardeningPngChunk('IDAT', $compressed)
+        . inputHardeningPngChunk('IEND', '');
 }
 
 function inputHardeningHasDecodedCache(FileSource $source): bool
@@ -567,9 +567,9 @@ function inputHardeningHasDecodedCache(FileSource $source): bool
 function inputHardeningPngChunk(string $type, string $data): string
 {
     return \pack('N', \strlen($data))
-        .$type
-        .$data
-        .\pack('N', \crc32($type.$data));
+        . $type
+        . $data
+        . \pack('N', \crc32($type . $data));
 }
 
 final class InputHardeningCountingSource implements FileSource

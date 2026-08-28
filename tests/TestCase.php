@@ -17,28 +17,6 @@ abstract class TestCase extends Orchestra
     private Migration $migration;
 
     /**
-     * Return the mocked console command used by this package's feature tests.
-     *
-     * @param  array<array-key, mixed>  $parameters
-     */
-    #[Override]
-    public function artisan($command, $parameters = []): PendingCommand
-    {
-        $pendingCommand = parent::artisan($command, $parameters);
-
-        \assert($pendingCommand instanceof PendingCommand);
-
-        return $pendingCommand;
-    }
-
-    protected function application(): Application
-    {
-        \assert($this->app instanceof Application);
-
-        return $this->app;
-    }
-
-    /**
      * Run the publishable package migration for each isolated test.
      */
     #[Override]
@@ -46,7 +24,7 @@ abstract class TestCase extends Orchestra
     {
         parent::setUp();
 
-        $migration = require __DIR__.'/../database/migrations/create_stored_files_table.php.stub';
+        $migration = require __DIR__ . '/../database/migrations/create_stored_files_table.php.stub';
 
         if ($migration instanceof Migration === false) {
             throw new RuntimeException('The FileMagic migration stub must return a Migration instance.');
@@ -69,6 +47,28 @@ abstract class TestCase extends Orchestra
         $this->migration->down();
 
         parent::tearDown();
+    }
+
+    /**
+     * Return the mocked console command used by this package's feature tests.
+     *
+     * @param  array<array-key, mixed>  $parameters
+     */
+    #[Override]
+    public function artisan($command, $parameters = []): PendingCommand
+    {
+        $pendingCommand = parent::artisan($command, $parameters);
+
+        \assert($pendingCommand instanceof PendingCommand);
+
+        return $pendingCommand;
+    }
+
+    protected function application(): Application
+    {
+        \assert($this->app instanceof Application);
+
+        return $this->app;
     }
 
     /**
@@ -98,7 +98,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('file-magic.collision_lock.wait_seconds', 1);
         $app['config']->set('filesystems.disks.testing', [
             'driver' => 'local',
-            'root' => \sys_get_temp_dir().'/file-magic-tests',
+            'root' => \sys_get_temp_dir() . '/file-magic-tests',
             'throw' => false,
         ]);
         $app['config']->set('file-magic.disk', 'testing');

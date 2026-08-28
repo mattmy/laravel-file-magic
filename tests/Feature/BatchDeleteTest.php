@@ -28,7 +28,7 @@ it('returns zero for an empty batch without resolving storage', function (): voi
     $factory = Mockery::mock(FilesystemFactory::class);
     $factory->shouldNotReceive('disk');
 
-    expect(batchDeleteAction($factory)->execute(new Collection))->toBe(0);
+    expect(batchDeleteAction($factory)->execute(new Collection()))->toBe(0);
 });
 
 it('uses one disk deletion and no existence checks on the successful path', function (): void {

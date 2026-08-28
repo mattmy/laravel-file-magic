@@ -68,7 +68,7 @@ it('stores non-images unchanged when image resizing is requested', function (): 
 
 it('keeps sources that Intervention Image cannot decode', function (): void {
     $source = new ContentFileSource('invalid png', 'broken.png', 'image/png');
-    $result = (new ImageProcessor)->process(
+    $result = (new ImageProcessor())->process(
         $source,
         'image/png',
         new ImageOptions(maxWidth: 800, quality: 75),

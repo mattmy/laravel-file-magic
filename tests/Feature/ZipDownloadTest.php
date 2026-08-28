@@ -29,7 +29,7 @@ it('downloads resolved files as a named ZIP in query order', function (): void {
 
     $response = FileMagic::find([$second->uuid, $first->id])->downloadZip('project-files');
     $archivePath = $response->getFile()->getPathname();
-    $archive = new ZipArchive;
+    $archive = new ZipArchive();
 
     expect($response->headers->get('Content-Type'))->toBe('application/zip')
         ->and($response->headers->get('Content-Disposition'))
@@ -86,7 +86,7 @@ it('removes source paths from archive entry names', function (): void {
     $file->forceFill(['original_filename' => '../../private/document.txt'])->save();
     $response = FileMagic::find($file)->downloadZip('safe-entries');
     $archivePath = $response->getFile()->getPathname();
-    $archive = new ZipArchive;
+    $archive = new ZipArchive();
 
     expect($archive->open($archivePath))->toBeTrue()
         ->and($archive->numFiles)->toBe(1)
