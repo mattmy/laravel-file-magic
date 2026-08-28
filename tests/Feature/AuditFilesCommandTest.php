@@ -19,6 +19,7 @@ use Mattmy\FileMagic\Support\CollisionLock;
 use Mattmy\FileMagic\Support\FileMagicConfig;
 use Mattmy\FileMagic\Tests\Fixtures\MismatchedDeleteStoredFile;
 use Mattmy\FileMagic\Tests\Fixtures\ScopedStoredFile;
+use Mattmy\FileMagic\Tests\TestCase;
 
 beforeEach(function (): void {
     Storage::fake('testing');
@@ -31,6 +32,7 @@ afterEach(function (): void {
 });
 
 it('reports a clean read-only audit', function (): void {
+    /** @var TestCase $this */
     FileMagic::fromContent('healthy')->store();
 
     $this->artisan('file-magic:audit')
@@ -41,6 +43,7 @@ it('reports a clean read-only audit', function (): void {
 });
 
 it('reports missing records without changing the database', function (): void {
+    /** @var TestCase $this */
     $file = FileMagic::fromContent('missing')->store();
     Storage::disk('testing')->delete($file->path);
 

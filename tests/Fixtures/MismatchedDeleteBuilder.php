@@ -7,6 +7,9 @@ namespace Mattmy\FileMagic\Tests\Fixtures;
 use Illuminate\Database\Eloquent\Builder;
 use Override;
 
+/**
+ * @extends Builder<MismatchedDeleteStoredFile>
+ */
 final class MismatchedDeleteBuilder extends Builder
 {
     /**

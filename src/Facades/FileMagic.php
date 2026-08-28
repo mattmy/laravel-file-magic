@@ -12,6 +12,7 @@ use Override;
  * @method static \Mattmy\FileMagic\PendingFile fromPath(string $path)
  * @method static \Mattmy\FileMagic\PendingFile fromContent(string $contents, string|null $originalFilename = null, string|null $mimeType = null)
  * @method static \Mattmy\FileMagic\PendingFile fromBase64(string $base64, string|null $originalFilename = null)
+ * @method static \Mattmy\FileMagic\PendingFile fromUrl(string $url, \Mattmy\FileMagic\Data\RemoteFileOptions|null $options = null)
  * @method static \Mattmy\FileMagic\PendingFile text(string $text)
  * @method static \Mattmy\FileMagic\PendingFile json(array<array-key, mixed>|\JsonSerializable $data)
  * @method static \Mattmy\FileMagic\PendingFile csv(iterable<array-key, array<array-key, scalar|null>> $rows)

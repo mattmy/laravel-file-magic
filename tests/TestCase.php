@@ -30,6 +30,8 @@ abstract class TestCase extends Orchestra
         }
 
         $this->migration = $migration;
+        // Laravel migration lifecycle methods are defined by concrete migration classes.
+        // @phpstan-ignore method.notFound
         $this->migration->up();
     }
 
@@ -39,6 +41,8 @@ abstract class TestCase extends Orchestra
     #[Override]
     protected function tearDown(): void
     {
+        // Laravel migration lifecycle methods are defined by concrete migration classes.
+        // @phpstan-ignore method.notFound
         $this->migration->down();
 
         parent::tearDown();

@@ -29,6 +29,9 @@ final class TrackingStoredFile extends StoredFile
     {
         self::$queriesWithoutScopes++;
 
-        return parent::newQueryWithoutScopes();
+        /** @var Builder<TrackingStoredFile> $builder */
+        $builder = parent::newQueryWithoutScopes();
+
+        return $builder;
     }
 }
