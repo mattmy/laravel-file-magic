@@ -70,6 +70,9 @@ FileMagic::json(['status' => 'ready'])->named('status')->store();
 FileMagic::csv($rows)->named('report')->store();
 ```
 
+`csv()` fully materializes the generated output in PHP memory before it returns a
+`PendingFile`. Use it only when the complete CSV fits within the worker's memory limit.
+
 ## Configure a file
 
 ```php

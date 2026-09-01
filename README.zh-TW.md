@@ -70,6 +70,9 @@ FileMagic::json(['status' => 'ready'])->named('status')->store();
 FileMagic::csv($rows)->named('report')->store();
 ```
 
+`csv()` 會在回傳 `PendingFile` 前，先把產生的完整輸出放入 PHP 記憶體。請只在完整 CSV
+能容納於 worker 記憶體上限時使用。
+
 ## 設定檔案
 
 ```php
