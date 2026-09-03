@@ -9,7 +9,7 @@ files without building the same workflow for every source.
 ## What you can do
 
 - Store uploaded files, local files, content, Base64, and remote HTTP(S) files.
-- Generate and store TXT, JSON, and CSV documents.
+- Generate and store TXT, JSON, CSV, and application-generated content with a trusted MIME type.
 - Choose the disk, directory, filename, visibility, and collision behavior for each file.
 - Limit file size and allow or block MIME types.
 - Attach metadata and associate files with Eloquent models.
@@ -58,6 +58,7 @@ return FileMagic::find($file)->download();
 FileMagic::fromUpload($uploadedFile)->store();
 FileMagic::fromPath($trustedPath)->store();
 FileMagic::fromContent($contents, 'report.pdf')->store();
+FileMagic::fromGeneratedContent($dxfContents, 'drawing.dxf', 'image/vnd.dxf')->store();
 FileMagic::fromBase64($base64, 'avatar.png')->store();
 FileMagic::fromUrl('https://example.com/manual.pdf')->store();
 ```
@@ -70,8 +71,13 @@ FileMagic::json(['status' => 'ready'])->named('status')->store();
 FileMagic::csv($rows)->named('report')->store();
 ```
 
-`csv()` fully materializes the generated output in PHP memory before it returns a
-`PendingFile`. Use it only when the complete CSV fits within the worker's memory limit.
+```php
+// Unsafe: neither the bytes nor MIME type are application-controlled.
+FileMagic::fromGeneratedContent($request->getContent(), null, $request->header('Content-Type'));
+```
+
+The complete `$contents` string is already in PHP memory. Prefer upload, path, or remote
+sources when generated content may approach the worker's memory limit.
 
 ## Configure a file
 

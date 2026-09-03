@@ -11,6 +11,7 @@ use Override;
  * @method static \Mattmy\FileMagic\PendingFile fromUpload(\Illuminate\Http\UploadedFile $file)
  * @method static \Mattmy\FileMagic\PendingFile fromPath(string $path)
  * @method static \Mattmy\FileMagic\PendingFile fromContent(string $contents, string|null $originalFilename = null, string|null $mimeType = null)
+ * @method static \Mattmy\FileMagic\PendingFile fromGeneratedContent(string $contents, string|null $originalFilename = null, string|null $mimeType = null)
  * @method static \Mattmy\FileMagic\PendingFile fromBase64(string $base64, string|null $originalFilename = null)
  * @method static \Mattmy\FileMagic\PendingFile fromUrl(string $url, \Mattmy\FileMagic\Data\RemoteFileOptions|null $options = null)
  * @method static \Mattmy\FileMagic\PendingFile text(string $text)

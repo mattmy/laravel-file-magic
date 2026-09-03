@@ -250,6 +250,38 @@ it('rejects original image policy failures before image processing', function (
     ],
 ]);
 
+it('applies size and MIME policies to trusted generated content', function (
+    Closure $configure,
+    string $exception,
+): void {
+    $pending = FileMagic::fromGeneratedContent(
+        'DXF-like contents',
+        'drawing.dxf',
+        'image/vnd.dxf',
+    );
+    $configured = $configure($pending);
+
+    \assert($configured instanceof PendingFile);
+
+    expect(static fn () => $configured->store())->toThrow($exception);
+
+    expect(StoredFile::query()->count())->toBe(0);
+    Storage::disk('testing')->assertDirectoryEmpty('/');
+})->with([
+    'oversized source' => [
+        static fn (PendingFile $pending): PendingFile => $pending->maxSize(4),
+        FileTooLarge::class,
+    ],
+    'blocked trusted MIME type' => [
+        static fn (PendingFile $pending): PendingFile => $pending->blockMimeTypes(['image/vnd.dxf']),
+        DisallowedMimeType::class,
+    ],
+    'trusted MIME type outside allowlist' => [
+        static fn (PendingFile $pending): PendingFile => $pending->allowMimeTypes(['text/plain']),
+        DisallowedMimeType::class,
+    ],
+]);
+
 it('rejects image output that grows beyond the accepted source size', function (): void {
     $contents = inputHardeningPng(1, 1);
 
