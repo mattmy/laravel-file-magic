@@ -15,6 +15,7 @@ final readonly class GeneratedDocumentSource implements TrustedMimeTypeSource
     public function __construct(
         private string $contents,
         private string $mimeType,
+        private ?string $originalFilename = null,
     ) {}
 
     /**
@@ -29,12 +30,12 @@ final readonly class GeneratedDocumentSource implements TrustedMimeTypeSource
     }
 
     /**
-     * Generated documents do not have an untrusted original filename.
+     * Return the optional original filename.
      */
     #[Override]
     public function originalFilename(): ?string
     {
-        return null;
+        return $this->originalFilename;
     }
 
     /**

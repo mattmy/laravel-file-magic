@@ -15,6 +15,7 @@ use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Queries\FileFinder;
 use Mattmy\FileMagic\Sources\Base64FileSource;
 use Mattmy\FileMagic\Sources\ContentFileSource;
+use Mattmy\FileMagic\Sources\GeneratedDocumentSource;
 use Mattmy\FileMagic\Sources\PathFileSource;
 use Mattmy\FileMagic\Sources\RemoteFileSource;
 use Mattmy\FileMagic\Sources\UploadedFileSource;
@@ -22,6 +23,7 @@ use Mattmy\FileMagic\Support\DocumentFactory;
 use Mattmy\FileMagic\Support\FileMagicConfig;
 use Mattmy\FileMagic\Support\RemoteDownloader;
 use Mattmy\FileMagic\Support\RemoteFileOptionsFactory;
+use Symfony\Component\Mime\MimeTypes;
 
 final class FileMagic
 {
@@ -64,6 +66,25 @@ final class FileMagic
         ?string $mimeType = null,
     ): PendingFile {
         return $this->pending(new ContentFileSource($contents, $originalFilename, $mimeType));
+    }
+
+    /**
+     * Begin storing application-generated content with an optional trusted MIME type.
+     */
+    public function fromGeneratedContent(
+        string $contents,
+        ?string $originalFilename = null,
+        ?string $mimeType = null,
+    ): PendingFile {
+        if ($mimeType === null) {
+            return $this->fromContent($contents, $originalFilename);
+        }
+
+        if (MimeTypes::getDefault()->getExtensions($mimeType) === []) {
+            return $this->fromContent($contents, $originalFilename, $mimeType);
+        }
+
+        return $this->pending(new GeneratedDocumentSource($contents, $mimeType, $originalFilename));
     }
 
     /**

@@ -9,7 +9,7 @@
 ## 可以做什麼
 
 - 儲存上傳檔案、本機檔案、字串內容、Base64 與遠端 HTTP(S) 檔案。
-- 產生並儲存 TXT、JSON 與 CSV 文件。
+- 產生並儲存 TXT、JSON、CSV，以及具有可信任 MIME type 的應用程式產物。
 - 為每個檔案選擇 disk、目錄、檔名、visibility 與檔名碰撞處理方式。
 - 限制檔案大小，並允許或封鎖指定 MIME types。
 - 加入 metadata，並將檔案關聯至 Eloquent Model。
@@ -58,6 +58,7 @@ return FileMagic::find($file)->download();
 FileMagic::fromUpload($uploadedFile)->store();
 FileMagic::fromPath($trustedPath)->store();
 FileMagic::fromContent($contents, 'report.pdf')->store();
+FileMagic::fromGeneratedContent($dxfContents, 'drawing.dxf', 'image/vnd.dxf')->store();
 FileMagic::fromBase64($base64, 'avatar.png')->store();
 FileMagic::fromUrl('https://example.com/manual.pdf')->store();
 ```
@@ -70,8 +71,13 @@ FileMagic::json(['status' => 'ready'])->named('status')->store();
 FileMagic::csv($rows)->named('report')->store();
 ```
 
-`csv()` 會在回傳 `PendingFile` 前，先把產生的完整輸出放入 PHP 記憶體。請只在完整 CSV
-能容納於 worker 記憶體上限時使用。
+```php
+// 不安全：bytes 與 MIME type 都不是由應用程式控制。
+FileMagic::fromGeneratedContent($request->getContent(), null, $request->header('Content-Type'));
+```
+
+完整 `$contents` 字串在呼叫前就已位於 PHP 記憶體。產物可能接近 worker 記憶體上限時，請改用
+upload、path 或 remote source。
 
 ## 設定檔案
 
