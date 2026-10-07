@@ -14,6 +14,8 @@ final readonly class ImageOptions
 
     /**
      * Describe an optional image resize and encoding operation.
+     *
+     * @throws InvalidArgumentException
      */
     public function __construct(
         public int $maxWidth,

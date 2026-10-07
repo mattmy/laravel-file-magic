@@ -6,14 +6,14 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
+return new class() extends Migration
 {
     /**
      * Create the stored files table.
      */
     public function up(): void
     {
-        Schema::create((string) \config('file-magic.table', 'stored_files'), function (Blueprint $table): void {
+        Schema::create((string) config('file-magic.table', 'stored_files'), function (Blueprint $table): void {
             $table->id();
             $table->uuid('uuid')->unique();
             $table->string('disk');
@@ -40,6 +40,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists((string) \config('file-magic.table', 'stored_files'));
+        Schema::dropIfExists((string) config('file-magic.table', 'stored_files'));
     }
 };

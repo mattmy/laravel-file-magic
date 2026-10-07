@@ -18,8 +18,36 @@ beforeEach(function (): void {
     Storage::fake('testing');
 });
 
+it('removes a new object when a model event cancels persistence', function (string $event): void {
+    StoredFile::{$event}(static fn (): bool => false);
+
+    expect(static fn () => app(FileMagic::class)->fromContent('contents')->named('cancelled')->store())
+        ->toThrow(FileRecordFailed::class);
+
+    expect(StoredFile::query()->count())->toBe(0);
+    Storage::disk('testing')->assertMissing('files/cancelled.txt');
+})->with(['saving', 'creating']);
+
+it('restores an overwritten object when a model event cancels its update', function (): void {
+    $original = app(FileMagic::class)->fromContent('old contents')
+        ->named('same')->visibility(FileVisibility::Public)->store();
+    StoredFile::updating(static fn (): bool => false);
+
+    expect(static fn () => app(FileMagic::class)->fromContent('new contents')
+        ->named('same')->visibility(FileVisibility::Private)
+        ->onCollision(CollisionPolicy::Overwrite)->store())
+        ->toThrow(FileRecordFailed::class);
+
+    $persisted = StoredFile::query()->findOrFail($original->id);
+
+    expect($persisted->checksum)->toBe($original->checksum)
+        ->and($persisted->contents())->toBe('old contents')
+        ->and($persisted->visibility)->toBe(FileVisibility::Public)
+        ->and(Storage::disk('testing')->getVisibility($persisted->path))->toBe('public');
+});
+
 it('restores original content visibility and record when overwrite persistence fails', function (): void {
-    $original = \app(FileMagic::class)
+    $original = app(FileMagic::class)
         ->fromContent('old contents', 'old.txt')
         ->named('same')
         ->visibility(FileVisibility::Public)
@@ -28,10 +56,10 @@ it('restores original content visibility and record when overwrite persistence f
     $originalChecksum = $original->checksum;
     $originalUpdatedAt = $original->updated_at?->toDateTimeString();
 
-    \config()->set('file-magic.model', FailingStoredFile::class);
+    config()->set('file-magic.model', FailingStoredFile::class);
 
     try {
-        \app(FileMagic::class)
+        app(FileMagic::class)
             ->fromContent('new contents', 'new.txt')
             ->named('same')
             ->visibility(FileVisibility::Private)
@@ -88,7 +116,7 @@ it('restores an existing object when overwrite storage returns false', function 
         })
         ->andReturnTrue();
 
-    \app(FileMagic::class)
+    app(FileMagic::class)
         ->fromContent('new contents')
         ->named('same')
         ->onCollision(CollisionPolicy::Overwrite)
@@ -108,7 +136,7 @@ it('does not start overwrite when the original visibility cannot be backed up', 
     $filesystem->shouldNotReceive('readStream');
     $filesystem->shouldNotReceive('put');
 
-    \app(FileMagic::class)
+    app(FileMagic::class)
         ->fromContent('new contents')
         ->named('same')
         ->onCollision(CollisionPolicy::Overwrite)
@@ -136,7 +164,7 @@ it('preserves operation and recovery failures when overwrite restoration fails',
         ->andThrow(new RuntimeException('Simulated recovery failure.'));
 
     try {
-        \app(FileMagic::class)
+        app(FileMagic::class)
             ->fromContent('new contents')
             ->named('same')
             ->onCollision(CollisionPolicy::Overwrite)

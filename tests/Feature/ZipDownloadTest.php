@@ -110,7 +110,7 @@ it('rejects an empty ZIP query', function (): void {
 })->throws(FileNotFound::class);
 
 it('rejects ZIP downloads over the configured file limit', function (): void {
-    \config()->set('file-magic.zip.max_files', 1);
+    config()->set('file-magic.zip.max_files', 1);
     $first = FileMagic::fromContent('first')->store();
     $second = FileMagic::fromContent('second')->store();
 
@@ -118,7 +118,7 @@ it('rejects ZIP downloads over the configured file limit', function (): void {
 })->throws(ZipLimitExceeded::class);
 
 it('rejects ZIP downloads over the configured metadata size limit', function (): void {
-    \config()->set('file-magic.zip.max_size', 5);
+    config()->set('file-magic.zip.max_size', 5);
     $file = FileMagic::fromContent('contents')->store();
 
     FileMagic::find($file)->downloadZip();
@@ -127,7 +127,7 @@ it('rejects ZIP downloads over the configured metadata size limit', function ():
 it('enforces the actual streamed size when stored metadata is stale', function (): void {
     $file = FileMagic::fromContent('contents')->store();
     $file->forceFill(['size' => 1])->save();
-    \config()->set('file-magic.zip.max_size', 5);
+    config()->set('file-magic.zip.max_size', 5);
 
     FileMagic::find($file)->downloadZip();
 })->throws(ZipLimitExceeded::class);

@@ -6,11 +6,16 @@ namespace Mattmy\FileMagic;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection as SupportCollection;
+use JsonSerializable;
 use Mattmy\FileMagic\Actions\CreateZipDownload;
 use Mattmy\FileMagic\Actions\DeleteFiles;
 use Mattmy\FileMagic\Actions\StoreFile;
 use Mattmy\FileMagic\Contracts\FileSource;
 use Mattmy\FileMagic\Data\RemoteFileOptions;
+use Mattmy\FileMagic\Exceptions\InvalidBase64;
+use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
+use Mattmy\FileMagic\Exceptions\InvalidDocumentData;
+use Mattmy\FileMagic\Exceptions\InvalidFileSource;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Queries\FileFinder;
 use Mattmy\FileMagic\Sources\Base64FileSource;
@@ -43,6 +48,8 @@ final class FileMagic
 
     /**
      * Begin storing a Laravel uploaded file.
+     *
+     * @throws InvalidFileSource
      */
     public function fromUpload(UploadedFile $file): PendingFile
     {
@@ -51,6 +58,8 @@ final class FileMagic
 
     /**
      * Begin storing a readable local file.
+     *
+     * @throws InvalidFileSource
      */
     public function fromPath(string $path): PendingFile
     {
@@ -89,6 +98,8 @@ final class FileMagic
 
     /**
      * Begin storing a plain Base64 value or Data URI.
+     *
+     * @throws InvalidBase64
      */
     public function fromBase64(string $base64, ?string $originalFilename = null): PendingFile
     {
@@ -97,6 +108,8 @@ final class FileMagic
 
     /**
      * Begin securely downloading and storing a remote HTTP file.
+     *
+     * @throws InvalidConfiguration
      */
     public function fromUrl(string $url, ?RemoteFileOptions $options = null): PendingFile
     {
@@ -109,6 +122,8 @@ final class FileMagic
 
     /**
      * Begin storing a generated UTF-8 plain-text document.
+     *
+     * @throws InvalidDocumentData
      */
     public function text(string $text): PendingFile
     {
@@ -118,9 +133,11 @@ final class FileMagic
     /**
      * Begin storing a generated JSON document.
      *
-     * @param  array<array-key, mixed>|\JsonSerializable  $data
+     * @param  array<array-key, mixed>|JsonSerializable  $data
+     *
+     * @throws InvalidDocumentData
      */
-    public function json(array|\JsonSerializable $data): PendingFile
+    public function json(array|JsonSerializable $data): PendingFile
     {
         return $this->pending($this->documents->json($data));
     }
@@ -129,6 +146,8 @@ final class FileMagic
      * Begin storing a generated CSV document.
      *
      * @param  iterable<array-key, array<array-key, scalar|null>>  $rows
+     *
+     * @throws InvalidDocumentData
      */
     public function csv(iterable $rows): PendingFile
     {

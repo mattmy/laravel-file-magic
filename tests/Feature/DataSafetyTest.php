@@ -26,7 +26,7 @@ beforeEach(function (): void {
 it('rejects an incompatible model target before deleting its object or a configured record', function (): void {
     $file = FileMagic::fromContent('original')->named('original')->store();
 
-    \config()->set('file-magic.model', TrackingStoredFile::class);
+    config()->set('file-magic.model', TrackingStoredFile::class);
 
     expect(static fn () => FileMagic::find($file)->delete())
         ->toThrow(InvalidFileTarget::class);
@@ -47,7 +47,7 @@ it('rejects invalid model target identity before querying', function (): void {
     $wrongTable->setTable('other_files');
     $wrongConnection->setConnection('other');
     $missingKey->setAttribute($missingKey->getKeyName(), null);
-    \config()->set('database.connections.other', \config('database.connections.testing'));
+    config()->set('database.connections.other', config('database.connections.testing'));
     DB::listen(static function () use (&$queries): void {
         $queries++;
     });
@@ -61,7 +61,7 @@ it('rejects invalid model target identity before querying', function (): void {
 });
 
 it('returns a configured canonical model for a compatible subclass target', function (): void {
-    \config()->set('file-magic.model', CompatibleStoredFile::class);
+    config()->set('file-magic.model', CompatibleStoredFile::class);
 
     $file = FileMagic::fromContent('contents')->store();
 
@@ -85,7 +85,7 @@ it('deduplicates same-row compatible subclasses into one canonical model', funct
 });
 
 it('deduplicates child subclasses of a configured custom model into one canonical model', function (): void {
-    \config()->set('file-magic.model', CompatibleStoredFile::class);
+    config()->set('file-magic.model', CompatibleStoredFile::class);
 
     $file = FileMagic::fromContent('contents')->store();
     $child = CompatibleStoredFileChild::query()->findOrFail($file->getKey());
@@ -243,7 +243,7 @@ it('skips stale and scoped-out model targets', function (): void {
 
     $selector->setRawAttributes($scoped->getAttributes(), true);
     $selector->exists = true;
-    \config()->set('file-magic.model', GloballyScopedStoredFile::class);
+    config()->set('file-magic.model', GloballyScopedStoredFile::class);
 
     expect(FileMagic::find($selector)->get())->toBeEmpty();
 });
@@ -306,7 +306,7 @@ it('preserves record and cleanup failures when a newly written object cannot be 
     $factory = Mockery::mock(FilesystemFactory::class);
 
     $this->application()->instance(FilesystemFactory::class, $factory);
-    \config()->set('file-magic.model', FailingStoredFile::class);
+    config()->set('file-magic.model', FailingStoredFile::class);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/new.txt')->andReturnFalse();
     $filesystem->shouldReceive('put')->once()->andReturnTrue();
@@ -329,7 +329,7 @@ it('preserves record and cleanup failures when deleting a newly written object t
     $factory = Mockery::mock(FilesystemFactory::class);
 
     $this->application()->instance(FilesystemFactory::class, $factory);
-    \config()->set('file-magic.model', FailingStoredFile::class);
+    config()->set('file-magic.model', FailingStoredFile::class);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->once()->with('files/new.txt')->andReturnFalse();
     $filesystem->shouldReceive('put')->once()->andReturnTrue();
@@ -351,7 +351,7 @@ it('preserves record and cleanup failures when deleting a newly written object t
 it('updates the existing overwrite record when its global scope hides it', function (): void {
     $original = FileMagic::fromContent('old contents')->named('same')->store();
 
-    \config()->set('file-magic.model', GloballyScopedStoredFile::class);
+    config()->set('file-magic.model', GloballyScopedStoredFile::class);
 
     $replacement = FileMagic::fromContent('new contents')
         ->named('same')

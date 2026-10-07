@@ -16,6 +16,8 @@ final class FakeHostResolver implements HostResolver
     public array $resolvedHosts = [];
 
     /**
+     * Configure deterministic hostname resolutions for remote source tests.
+     *
      * @param  array<string, non-empty-list<string>>  $addresses
      */
     public function __construct(private readonly array $addresses) {}

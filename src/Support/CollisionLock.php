@@ -94,7 +94,7 @@ final readonly class CollisionLock
             fn (array $location): string => $this->key($location['disk'], $location['path']),
             $locations,
         )));
-        \sort($keys, SORT_STRING);
+        \sort($keys, \SORT_STRING);
 
         /** @var list<Lock> $acquired */
         $acquired = [];

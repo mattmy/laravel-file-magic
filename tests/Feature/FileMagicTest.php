@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
@@ -229,4 +230,18 @@ it('accepts variadic array collection and model targets in order', function (): 
         ->and($ids)->toBe([$second->id, $first->id])
         ->and(FileMagic::find($first)->one()?->getKey())->toBe($first->getKey())
         ->and(FileMagic::find([])->get()->isEmpty())->toBeTrue();
+});
+
+it('resolves uppercase UUID targets once and deduplicates mixed identities', function (): void {
+    $file = FileMagic::fromContent('contents')->store();
+    $other = FileMagic::fromContent('other')->store();
+    $queries = 0;
+    DB::listen(static function () use (&$queries): void {
+        $queries++;
+    });
+    $query = FileMagic::find(\strtoupper($file->uuid), $other->id, $file->uuid);
+
+    expect($query->get())->toHaveCount(2)
+        ->and($query->one()?->getKey())->toBe($file->getKey())
+        ->and($queries)->toBe(1);
 });

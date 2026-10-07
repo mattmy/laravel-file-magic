@@ -56,7 +56,7 @@ final readonly class RemoteUrlGuard
         if (
             $url === '' ||
             \preg_match('/[\x00-\x20\x7F]/', $url) === 1 ||
-            \filter_var($url, FILTER_VALIDATE_URL) === false
+            \filter_var($url, \FILTER_VALIDATE_URL) === false
         ) {
             throw new InvalidRemoteUrl('The remote URL is invalid.');
         }
@@ -98,7 +98,7 @@ final readonly class RemoteUrlGuard
     {
         $host = \strtolower(\trim($host, '[]'));
 
-        if (\filter_var($host, FILTER_VALIDATE_IP) !== false) {
+        if (\filter_var($host, \FILTER_VALIDATE_IP) !== false) {
             return $host;
         }
 
@@ -109,7 +109,7 @@ final readonly class RemoteUrlGuard
         if (
             $host === '' ||
             \str_ends_with($host, '.') ||
-            \filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false
+            \filter_var($host, \FILTER_VALIDATE_DOMAIN, \FILTER_FLAG_HOSTNAME) === false
         ) {
             throw new InvalidRemoteUrl('The remote URL host is invalid.');
         }
@@ -205,9 +205,9 @@ final readonly class RemoteUrlGuard
             $packedAddress === false ||
             \filter_var(
                 $address,
-                FILTER_VALIDATE_IP,
-                FILTER_FLAG_GLOBAL_RANGE,
-            ) === false
+                \FILTER_VALIDATE_IP,
+                \FILTER_FLAG_GLOBAL_RANGE,
+            ) !== $address
         ) {
             return false;
         }

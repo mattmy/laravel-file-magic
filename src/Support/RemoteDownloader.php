@@ -142,7 +142,7 @@ final readonly class RemoteDownloader
                 ->withOptions([
                     'allow_redirects' => false,
                     'curl' => [
-                        CURLOPT_RESOLVE => [$endpoint->curlResolveEntry()],
+                        \CURLOPT_RESOLVE => [$endpoint->curlResolveEntry()],
                     ],
                     'on_headers' => $this->headerLimit($maximumBytes),
                     'proxy' => '',
@@ -273,7 +273,7 @@ final readonly class RemoteDownloader
      */
     private function urlFilename(string $url): ?string
     {
-        $path = \parse_url($url, PHP_URL_PATH);
+        $path = \parse_url($url, \PHP_URL_PATH);
 
         if (\is_string($path) === false) {
             return null;

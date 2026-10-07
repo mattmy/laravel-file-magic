@@ -333,7 +333,7 @@ final readonly class DeleteFiles
             );
         }
 
-        return $deleted;
+        return \count($keys);
     }
 
     /**

@@ -30,7 +30,7 @@ function storedFileKey(Model $model): int
 {
     $key = $model->getKey();
 
-    if (! is_int($key)) {
+    if (! \is_int($key)) {
         throw new RuntimeException('The stored file test model must have an integer key.');
     }
 

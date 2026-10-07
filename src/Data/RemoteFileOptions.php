@@ -41,6 +41,8 @@ final readonly class RemoteFileOptions
      * @param  array<array-key, mixed>  $allowedHosts
      * @param  array<array-key, mixed>  $allowedPorts
      * @param  array<array-key, mixed>  $allowedPrivateHosts
+     *
+     * @throws InvalidRemoteOptions
      */
     public function __construct(
         public bool $verifyTls = true,
@@ -171,7 +173,7 @@ final readonly class RemoteFileOptions
      */
     private function isValidHost(string $host): bool
     {
-        return \filter_var($host, FILTER_VALIDATE_IP) !== false ||
-            \filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) !== false;
+        return \filter_var($host, \FILTER_VALIDATE_IP) !== false ||
+            \filter_var($host, \FILTER_VALIDATE_DOMAIN, \FILTER_FLAG_HOSTNAME) !== false;
     }
 }

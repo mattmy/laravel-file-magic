@@ -148,6 +148,8 @@ class StoredFile extends Model
 
     /**
      * Read the entire physical file into memory.
+     *
+     * @throws FileNotFound
      */
     public function contents(): string
     {
@@ -164,6 +166,8 @@ class StoredFile extends Model
      * Open the physical file as a readable stream.
      *
      * @return resource
+     *
+     * @throws FileNotFound
      */
     public function readStream()
     {
@@ -190,6 +194,8 @@ class StoredFile extends Model
 
     /**
      * Delete the physical file before deleting its database record.
+     *
+     * @throws FileNotFound
      */
     #[Override]
     public function delete(): ?bool

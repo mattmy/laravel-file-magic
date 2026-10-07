@@ -10,7 +10,7 @@ use Override;
 final readonly class GeneratedDocumentSource implements TrustedMimeTypeSource
 {
     /**
-     * Create a package-generated document source.
+     * Create a source whose generated format is guaranteed by the application or package.
      */
     public function __construct(
         private string $contents,
@@ -48,7 +48,7 @@ final readonly class GeneratedDocumentSource implements TrustedMimeTypeSource
     }
 
     /**
-     * Return the MIME type guaranteed by package-controlled serialization.
+     * Return the MIME type guaranteed by package or application-generated content.
      */
     #[Override]
     public function trustedMimeType(): string

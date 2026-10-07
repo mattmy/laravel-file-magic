@@ -18,11 +18,11 @@ final class NativeHostResolver implements HostResolver
     #[Override]
     public function resolve(string $host): array
     {
-        if (\filter_var($host, FILTER_VALIDATE_IP) !== false) {
+        if (\filter_var($host, \FILTER_VALIDATE_IP) !== false) {
             return [$host];
         }
 
-        $records = \dns_get_record($host, DNS_A | DNS_AAAA);
+        $records = \dns_get_record($host, \DNS_A | \DNS_AAAA);
 
         if ($records === false) {
             throw new RemoteDownloadFailed('The remote host could not be resolved.');
@@ -35,7 +35,7 @@ final class NativeHostResolver implements HostResolver
 
             if (
                 \is_string($address) &&
-                \filter_var($address, FILTER_VALIDATE_IP) !== false &&
+                \filter_var($address, \FILTER_VALIDATE_IP) !== false &&
                 \in_array($address, $addresses, true) === false
             ) {
                 $addresses[] = $address;

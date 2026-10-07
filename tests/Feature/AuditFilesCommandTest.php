@@ -28,8 +28,8 @@ beforeEach(function (): void {
 });
 
 afterEach(function (): void {
-    \config()->set('file-magic.model', StoredFile::class);
-    \config()->set('file-magic.table', 'stored_files');
+    config()->set('file-magic.model', StoredFile::class);
+    config()->set('file-magic.table', 'stored_files');
 });
 
 it('reports a clean read-only audit', function (): void {
@@ -133,7 +133,7 @@ it('keeps a cleanup candidate when its object reappears after locking', function
     $filesystem = Mockery::mock(Filesystem::class);
     $factory = Mockery::mock(FilesystemFactory::class);
 
-    \config()->set('file-magic.collision_lock.enabled', true);
+    config()->set('file-magic.collision_lock.enabled', true);
     $factory->shouldReceive('disk')->once()->with('testing')->andReturn($filesystem);
     $filesystem->shouldReceive('exists')->twice()->with($file->path)->andReturn(false, true);
     app()->instance(FilesystemFactory::class, $factory);
@@ -208,7 +208,7 @@ it('deletes confirmed missing records in one bulk query per chunk', function ():
 });
 
 it('stops with a failure when affected rows do not match', function (): void {
-    \config()->set('file-magic.model', MismatchedDeleteStoredFile::class);
+    config()->set('file-magic.model', MismatchedDeleteStoredFile::class);
     $file = FileMagic::fromContent('missing')->store();
     Storage::disk('testing')->delete($file->path);
 
@@ -221,13 +221,13 @@ it('stops with a failure when affected rows do not match', function (): void {
 });
 
 it('returns a failure when the database query cannot run', function (): void {
-    \config()->set('file-magic.table', 'missing_stored_files_table');
+    config()->set('file-magic.table', 'missing_stored_files_table');
 
     $this->artisan('file-magic:audit')->assertExitCode(2);
 });
 
 it('uses a custom connection table primary key and ignores global scopes', function (): void {
-    \config()->set('database.connections.audit', [
+    config()->set('database.connections.audit', [
         'driver' => 'sqlite',
         'database' => ':memory:',
         'prefix' => '',
@@ -238,8 +238,8 @@ it('uses a custom connection table primary key and ignores global scopes', funct
         $table->string('path');
         $table->string('location_hash', 64);
     });
-    \config()->set('file-magic.model', ScopedStoredFile::class);
-    \config()->set('file-magic.table', 'audit_stored_files');
+    config()->set('file-magic.model', ScopedStoredFile::class);
+    config()->set('file-magic.table', 'audit_stored_files');
     DB::connection('audit')->table('audit_stored_files')->insert([
         'disk' => 'testing',
         'path' => 'missing/custom.txt',
@@ -305,7 +305,7 @@ function installAuditLock(callable $acquire): void
     $provider = Mockery::mock(LockProvider::class);
     $lock = Mockery::mock(LockContract::class);
 
-    \config()->set('file-magic.collision_lock.enabled', true);
+    config()->set('file-magic.collision_lock.enabled', true);
     $cache->shouldReceive('store')->once()->with(null)->andReturn($repository);
     $repository->shouldReceive('getStore')->once()->andReturn($provider);
     $provider->shouldReceive('lock')->once()->andReturn($lock);

@@ -10,7 +10,14 @@ use Illuminate\Support\Collection;
 use Mattmy\FileMagic\Actions\CreateZipDownload;
 use Mattmy\FileMagic\Actions\DeleteFiles;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
+use Mattmy\FileMagic\Exceptions\FileRecordFailed;
+use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
+use Mattmy\FileMagic\Exceptions\InvalidFileName;
 use Mattmy\FileMagic\Exceptions\InvalidFileTarget;
+use Mattmy\FileMagic\Exceptions\PartialFileDeletion;
+use Mattmy\FileMagic\Exceptions\ZipCreationFailed;
+use Mattmy\FileMagic\Exceptions\ZipCreationUnavailable;
+use Mattmy\FileMagic\Exceptions\ZipLimitExceeded;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Queries\FileFinder;
 use Mattmy\FileMagic\Support\FileMagicConfig;
@@ -39,6 +46,8 @@ final class FileQuery
 
     /**
      * Return the first resolved file model.
+     *
+     * @throws InvalidFileTarget
      */
     public function one(): ?StoredFile
     {
@@ -49,6 +58,8 @@ final class FileQuery
      * Return all resolved files as a standard Laravel collection.
      *
      * @return Collection<int, StoredFile>
+     *
+     * @throws InvalidFileTarget
      */
     public function get(): Collection
     {
@@ -59,6 +70,8 @@ final class FileQuery
      * Return public URLs keyed by model key for files that exist on disk.
      *
      * @return Collection<int|string, string>
+     *
+     * @throws InvalidFileTarget
      */
     public function urls(): Collection
     {
@@ -78,6 +91,8 @@ final class FileQuery
 
     /**
      * Determine whether the first resolved file exists on disk.
+     *
+     * @throws FileNotFound
      */
     public function exists(): bool
     {
@@ -86,6 +101,8 @@ final class FileQuery
 
     /**
      * Return the first resolved file's public URL.
+     *
+     * @throws FileNotFound
      */
     public function url(): string
     {
@@ -94,6 +111,9 @@ final class FileQuery
 
     /**
      * Return the first resolved file's temporary URL.
+     *
+     * @throws FileNotFound
+     * @throws InvalidConfiguration
      */
     public function temporaryUrl(?DateTimeInterface $expiration = null): string
     {
@@ -105,6 +125,8 @@ final class FileQuery
 
     /**
      * Read the first resolved file into memory.
+     *
+     * @throws FileNotFound
      */
     public function contents(): string
     {
@@ -115,6 +137,8 @@ final class FileQuery
      * Open the first resolved file as a readable stream.
      *
      * @return resource
+     *
+     * @throws FileNotFound
      */
     public function readStream()
     {
@@ -123,6 +147,8 @@ final class FileQuery
 
     /**
      * Create a streamed response for the first resolved file.
+     *
+     * @throws FileNotFound
      */
     public function download(?string $name = null): StreamedResponse
     {
@@ -131,6 +157,13 @@ final class FileQuery
 
     /**
      * Create a ZIP download containing every resolved file.
+     *
+     * @throws FileNotFound
+     * @throws InvalidConfiguration
+     * @throws InvalidFileName
+     * @throws ZipCreationFailed
+     * @throws ZipCreationUnavailable
+     * @throws ZipLimitExceeded
      */
     public function downloadZip(?string $name = null): BinaryFileResponse
     {
@@ -139,6 +172,10 @@ final class FileQuery
 
     /**
      * Delete every resolved file in filesystem and database batches.
+     *
+     * @throws FileRecordFailed
+     * @throws InvalidConfiguration
+     * @throws PartialFileDeletion
      */
     public function delete(): int
     {

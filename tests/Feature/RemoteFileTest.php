@@ -55,6 +55,8 @@ it('rejects non-global IPv4 addresses', function (string $address): void {
     'multicast' => '224.0.0.1',
     'reserved' => '240.0.0.1',
     'limited broadcast' => '255.255.255.255',
+    'invalid address' => 'not-an-ip-address',
+    'invalid IPv4' => '999.1.1.1',
 ]);
 
 it('allows IPv4 addresses outside the shared and benchmarking ranges', function (string $address): void {
@@ -94,6 +96,7 @@ it('rejects non-global IPv6 addresses including every IPv4-mapped address', func
     'link local' => 'fe80::1',
     'documentation' => '2001:db8::1',
     'multicast' => 'ff00::1',
+    'invalid IPv6' => '2001:gggg::1',
 ]);
 
 it('allows ordinary public IPv6 addresses', function (): void {

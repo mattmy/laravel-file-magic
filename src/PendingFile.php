@@ -11,6 +11,7 @@ use Mattmy\FileMagic\Contracts\ReleasableFileSource;
 use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
 use Mattmy\FileMagic\Enums\FileVisibility;
+use Mattmy\FileMagic\Exceptions\FileMagicException;
 use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
 use Mattmy\FileMagic\Exceptions\InvalidFileOwner;
 use Mattmy\FileMagic\Models\StoredFile;
@@ -60,6 +61,8 @@ final class PendingFile
 
     /**
      * Select the Laravel filesystem disk.
+     *
+     * @throws InvalidConfiguration
      */
     public function onDisk(string $disk): self
     {
@@ -114,6 +117,8 @@ final class PendingFile
 
     /**
      * Restrict the maximum trusted file size in bytes.
+     *
+     * @throws InvalidConfiguration
      */
     public function maxSize(int $bytes): self
     {
@@ -130,6 +135,8 @@ final class PendingFile
      * Restrict storage to the supplied trusted MIME types.
      *
      * @param  list<string>  $mimeTypes
+     *
+     * @throws InvalidConfiguration
      */
     public function allowMimeTypes(array $mimeTypes): self
     {
@@ -143,6 +150,8 @@ final class PendingFile
      * Reject the supplied trusted MIME types.
      *
      * @param  list<string>  $mimeTypes
+     *
+     * @throws InvalidConfiguration
      */
     public function blockMimeTypes(array $mimeTypes): self
     {
@@ -166,6 +175,8 @@ final class PendingFile
 
     /**
      * Associate the stored file with an Eloquent model.
+     *
+     * @throws InvalidFileOwner
      */
     public function ownedBy(Model $owner): self
     {
@@ -198,6 +209,8 @@ final class PendingFile
 
     /**
      * Store the file and return its database record.
+     *
+     * @throws FileMagicException If source validation, storage, persistence or recovery fails.
      */
     public function store(): StoredFile
     {

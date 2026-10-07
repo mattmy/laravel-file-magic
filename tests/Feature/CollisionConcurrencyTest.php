@@ -96,7 +96,7 @@ it('acquires unique path locks in canonical order and releases them in reverse',
             . \hash('sha256', $location['disk'] . "\0" . $location['path']),
         $locations,
     )));
-    \sort($keys, SORT_STRING);
+    \sort($keys, \SORT_STRING);
     $locks = [];
 
     foreach ($keys as $key) {

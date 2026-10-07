@@ -13,6 +13,8 @@ final readonly class UploadedFileSource implements FileSource
 {
     /**
      * Create a source from a valid Laravel uploaded file.
+     *
+     * @throws InvalidFileSource
      */
     public function __construct(private UploadedFile $file)
     {
@@ -25,6 +27,8 @@ final readonly class UploadedFileSource implements FileSource
      * Open the uploaded file as a binary stream.
      *
      * @return resource
+     *
+     * @throws InvalidFileSource
      */
     #[Override]
     public function openStream()
