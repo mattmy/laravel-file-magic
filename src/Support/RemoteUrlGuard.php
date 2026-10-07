@@ -207,7 +207,7 @@ final readonly class RemoteUrlGuard
                 $address,
                 \FILTER_VALIDATE_IP,
                 \FILTER_FLAG_GLOBAL_RANGE,
-            ) === false
+            ) !== $address
         ) {
             return false;
         }

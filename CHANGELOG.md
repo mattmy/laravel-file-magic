@@ -16,6 +16,7 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ### Changed
 
+- Preserve affected-row validation and remote IP policy under updated PHPStan and Larastan analysis.
 - Complete PHP coding-standard annotations and reuse the image quality bounds; validate CSV
   rows without copying their unchanged values.
 - Align the published migration stub's Laravel config helper calls and anonymous-class formatting
