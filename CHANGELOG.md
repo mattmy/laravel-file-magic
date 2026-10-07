@@ -18,8 +18,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 - Complete PHP coding-standard annotations and reuse the image quality bounds; validate CSV
   rows without copying their unchanged values.
-- Align the published migration stub's Laravel config helper calls without changing its schema
-  or execution behavior.
+- Align the published migration stub's Laravel config helper calls and anonymous-class formatting
+  without changing its schema or execution behavior.
 
 ### Added
 
