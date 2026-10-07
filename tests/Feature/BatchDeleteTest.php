@@ -145,7 +145,7 @@ it('keeps records whose storage state cannot be verified', function (): void {
 });
 
 it('fails explicitly when deleted record counts do not match confirmed objects', function (): void {
-    \config()->set('file-magic.model', MismatchedDeleteStoredFile::class);
+    config()->set('file-magic.model', MismatchedDeleteStoredFile::class);
     $file = FileMagic::fromContent('first')->store();
     $filesystem = Mockery::mock(Filesystem::class);
     $factory = Mockery::mock(FilesystemFactory::class);
@@ -160,7 +160,7 @@ it('uses the configured custom model for store find and batch delete', function 
     Schema::table('stored_files', static function (Blueprint $table): void {
         $table->renameColumn('id', 'file_id');
     });
-    \config()->set('file-magic.model', TrackingStoredFile::class);
+    config()->set('file-magic.model', TrackingStoredFile::class);
 
     $file = FileMagic::fromContent('custom model')->store();
     $found = FileMagic::find(storedFileKey($file))->one();
@@ -181,7 +181,7 @@ function batchDeleteAction(FilesystemFactory $factory): DeleteFiles
 {
     return new DeleteFiles(
         $factory,
-        \app(StoredFileModelResolver::class),
-        \app(CollisionLock::class),
+        app(StoredFileModelResolver::class),
+        app(CollisionLock::class),
     );
 }

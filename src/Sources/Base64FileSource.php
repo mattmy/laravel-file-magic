@@ -10,6 +10,7 @@ use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\InvalidBase64;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
 use Override;
+use Throwable;
 
 final class Base64FileSource implements FileSource, SizeLimitedFileSource
 {
@@ -27,6 +28,8 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
 
     /**
      * Parse and validate canonical Base64 without decoding its complete contents.
+     *
+     * @throws InvalidBase64
      */
     public function __construct(string $base64, private readonly ?string $originalFilename = null)
     {
@@ -51,6 +54,8 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
 
     /**
      * Apply the maximum decoded byte limit before materialization.
+     *
+     * @throws FileTooLarge
      */
     #[Override]
     public function limitSize(int $bytes): void
@@ -66,6 +71,9 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
      * Copy the decoded content into a seekable temporary stream.
      *
      * @return resource
+     *
+     * @throws InvalidBase64
+     * @throws InvalidFileSource
      */
     #[Override]
     public function openStream()
@@ -103,7 +111,7 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
             }
 
             return $stream;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             \fclose($stream);
 
             if ($exception instanceof InvalidBase64 || $exception instanceof InvalidFileSource) {

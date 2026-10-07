@@ -62,6 +62,26 @@ jobs:
       - name: Run tests
         run: composer test
 
+  lowest-dependencies:
+    name: Lowest compatible dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: fileinfo, zip, gd
+          tools: composer:v2
+
+      - name: Install lowest compatible dependencies
+        run: composer update --prefer-lowest --prefer-stable --prefer-dist --no-interaction --no-progress
+
+      - name: Run tests
+        run: composer test
+
   mysql:
     name: MySQL 8.4 migration
     runs-on: ubuntu-latest

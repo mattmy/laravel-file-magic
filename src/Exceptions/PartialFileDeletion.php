@@ -9,6 +9,8 @@ use Throwable;
 final class PartialFileDeletion extends FileMagicException
 {
     /**
+     * Preserve completed record deletions and keys whose deletion failed.
+     *
      * @param  list<int|string>  $failedKeys
      */
     public function __construct(

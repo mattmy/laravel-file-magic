@@ -12,6 +12,8 @@ final readonly class PathFileSource implements FileSource
 {
     /**
      * Create a source from a readable local path.
+     *
+     * @throws InvalidFileSource
      */
     public function __construct(private string $path)
     {
@@ -24,6 +26,8 @@ final readonly class PathFileSource implements FileSource
      * Open the local file as a binary stream.
      *
      * @return resource
+     *
+     * @throws InvalidFileSource
      */
     #[Override]
     public function openStream()

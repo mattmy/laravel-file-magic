@@ -24,6 +24,8 @@ final readonly class FileFinder
      *
      * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, covariant int|string|StoredFile>>  $targets
      * @return EloquentCollection<int, StoredFile>
+     *
+     * @throws InvalidFileTarget
      */
     public function find(array $targets): EloquentCollection
     {
@@ -32,7 +34,7 @@ final readonly class FileFinder
         $filesById = $storedFiles->keyBy(
             fn (StoredFile $file): string => (string) $this->modelKey($file),
         );
-        $filesByUuid = $storedFiles->keyBy('uuid');
+        $filesByUuid = $storedFiles->keyBy(static fn (StoredFile $file): string => \strtolower($file->uuid));
         $resolvedFiles = new EloquentCollection();
         $resolvedKeys = [];
 
@@ -99,7 +101,7 @@ final readonly class FileFinder
         }
 
         if (\is_string($target) && Str::isUuid($target)) {
-            return $target;
+            return \strtolower($target);
         }
 
         throw new InvalidFileTarget('A file target must be a positive integer ID, UUID, or stored file model.');

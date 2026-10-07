@@ -55,6 +55,13 @@ final readonly class StoreFile
 
     /**
      * Validate, store and persist a pending file.
+     *
+     * @throws InvalidConfiguration
+     * @throws FileTooLarge
+     * @throws DisallowedMimeType
+     * @throws FileWriteFailed
+     * @throws FileRecordFailed
+     * @throws FileRecoveryFailed
      */
     public function execute(PendingFile $pending): StoredFile
     {
@@ -196,7 +203,7 @@ final readonly class StoreFile
                     $source,
                     $diskName,
                     $path,
-                    \pathinfo($path, PATHINFO_FILENAME),
+                    \pathinfo($path, \PATHINFO_FILENAME),
                     $extension,
                     $visibility,
                     $policy,
@@ -343,9 +350,9 @@ final readonly class StoreFile
      */
     private function uniquePath(string $path): string
     {
-        $extension = \pathinfo($path, PATHINFO_EXTENSION);
-        $basename = \pathinfo($path, PATHINFO_FILENAME);
-        $directory = \pathinfo($path, PATHINFO_DIRNAME);
+        $extension = \pathinfo($path, \PATHINFO_EXTENSION);
+        $basename = \pathinfo($path, \PATHINFO_FILENAME);
+        $directory = \pathinfo($path, \PATHINFO_DIRNAME);
 
         $uniqueName = "{$basename}-" . Str::lower(Str::random(12)) . ".{$extension}";
 
@@ -369,6 +376,8 @@ final readonly class StoreFile
 
     /**
      * Create the configured Eloquent file record.
+     *
+     * @throws FileRecordFailed
      */
     private function createRecord(
         PendingFile $pending,
@@ -411,7 +420,9 @@ final readonly class StoreFile
             $file->owner()->associate($pending->owner());
         }
 
-        $file->saveOrFail();
+        if ($file->saveOrFail() === false) {
+            throw new FileRecordFailed('The stored-file model cancelled persistence.');
+        }
 
         return $file;
     }

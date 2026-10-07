@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file. FileMagic
 follows [Semantic Versioning](https://semver.org/) and the structure of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Compensate storage writes when a model event cancels record persistence, including
+  restoring overwritten content and visibility.
+- Resolve uppercase UUID targets in the same order and query as their lowercase equivalents.
+- Complete PHP coding-standard annotations and reuse the image quality bounds; validate CSV
+  rows without copying their unchanged values.
+- Add CI coverage for the lowest compatible dependency versions.
+
 ## [0.6.0] - 2026-09-03
 
 ### Added
@@ -130,7 +141,7 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 - Preservation of database records when storage state cannot be confirmed
   during deletion or consistency auditing.
 
-[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.6.0...HEAD
 [0.2.0]: https://github.com/mattmy/laravel-file-magic/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/mattmy/laravel-file-magic/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mattmy/laravel-file-magic/releases/tag/v0.1.0

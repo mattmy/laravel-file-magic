@@ -38,6 +38,8 @@ final class PathNormalizer
 
     /**
      * Normalize a relative storage directory.
+     *
+     * @throws InvalidStoragePath
      */
     public function directory(string $directory): string
     {
@@ -65,6 +67,8 @@ final class PathNormalizer
 
     /**
      * Validate and normalize a filename without its extension.
+     *
+     * @throws InvalidFileName
      */
     public function filename(string $filename): string
     {

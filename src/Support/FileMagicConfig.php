@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic\Support;
 
 use Illuminate\Contracts\Config\Repository as Config;
+use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Data\RemoteFileOptions;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
 use Mattmy\FileMagic\Enums\FileVisibility;
@@ -34,11 +35,7 @@ final readonly class FileMagicConfig
 
     private const int DEFAULT_ZIP_MAXIMUM_SIZE = 1073741824;
 
-    private const int MAXIMUM_IMAGE_QUALITY = 100;
-
     private const int MAXIMUM_REMOTE_PORT = 65535;
-
-    private const int MINIMUM_IMAGE_QUALITY = 1;
 
     private const int MINIMUM_REMOTE_PORT = 1;
 
@@ -118,8 +115,8 @@ final readonly class FileMagicConfig
         return $this->boundedInteger(
             'file-magic.image.quality',
             self::DEFAULT_IMAGE_QUALITY,
-            self::MINIMUM_IMAGE_QUALITY,
-            self::MAXIMUM_IMAGE_QUALITY,
+            ImageOptions::MINIMUM_QUALITY,
+            ImageOptions::MAXIMUM_QUALITY,
         );
     }
 
@@ -303,6 +300,8 @@ final readonly class FileMagicConfig
     }
 
     /**
+     * Return the default MIME allowlist.
+     *
      * @return list<string>
      */
     public function allowedMimeTypes(): array
@@ -311,6 +310,8 @@ final readonly class FileMagicConfig
     }
 
     /**
+     * Return the default MIME blocklist.
+     *
      * @return list<string>
      */
     public function blockedMimeTypes(): array

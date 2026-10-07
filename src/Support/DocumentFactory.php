@@ -17,13 +17,15 @@ final class DocumentFactory
 
     private const string TEXT_MIME_TYPE = 'text/plain';
 
-    private const int JSON_FLAGS = JSON_PRETTY_PRINT
-        | JSON_THROW_ON_ERROR
-        | JSON_UNESCAPED_SLASHES
-        | JSON_UNESCAPED_UNICODE;
+    private const int JSON_FLAGS = \JSON_PRETTY_PRINT
+        | \JSON_THROW_ON_ERROR
+        | \JSON_UNESCAPED_SLASHES
+        | \JSON_UNESCAPED_UNICODE;
 
     /**
      * Create a UTF-8 plain-text document.
+     *
+     * @throws InvalidDocumentData
      */
     public function text(string $text): GeneratedDocumentSource
     {
@@ -36,6 +38,8 @@ final class DocumentFactory
      * Create a formatted JSON document from structured data.
      *
      * @param  array<array-key, mixed>|JsonSerializable  $data
+     *
+     * @throws InvalidDocumentData
      */
     public function json(array|JsonSerializable $data): GeneratedDocumentSource
     {
@@ -52,6 +56,8 @@ final class DocumentFactory
      * Create a UTF-8 CSV document from consistently shaped rows.
      *
      * @param  iterable<array-key, array<array-key, scalar|null>>  $rows
+     *
+     * @throws InvalidDocumentData
      */
     public function csv(iterable $rows): GeneratedDocumentSource
     {
@@ -127,9 +133,7 @@ final class DocumentFactory
             throw new InvalidDocumentData('Every CSV row must be an array.');
         }
 
-        $normalized = [];
-
-        foreach ($row as $key => $value) {
+        foreach ($row as $value) {
             if (\is_scalar($value) === false && $value !== null) {
                 throw new InvalidDocumentData('Every CSV value must be scalar or null.');
             }
@@ -137,11 +141,9 @@ final class DocumentFactory
             if (\is_string($value)) {
                 $this->ensureUtf8($value);
             }
-
-            $normalized[$key] = $value;
         }
 
-        return $normalized;
+        return $row;
     }
 
     /**

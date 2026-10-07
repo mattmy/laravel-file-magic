@@ -12,6 +12,7 @@ use Mattmy\FileMagic\Data\FileMetadata;
 use Mattmy\FileMagic\Exceptions\FileMagicException;
 use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
+use Throwable;
 
 final class FileInspector
 {
@@ -96,7 +97,7 @@ final class FileInspector
             return $snapshot;
         } catch (FileMagicException $exception) {
             throw $exception;
-        } catch (\Throwable $exception) {
+        } catch (Throwable $exception) {
             throw new InvalidFileSource('The file source could not be captured.', previous: $exception);
         } finally {
             \fclose($stream);
@@ -130,7 +131,7 @@ final class FileInspector
      */
     private function detectMimeType(string $sample): string
     {
-        $mimeType = (new finfo(FILEINFO_MIME_TYPE))->buffer($sample);
+        $mimeType = (new finfo(\FILEINFO_MIME_TYPE))->buffer($sample);
 
         return \is_string($mimeType) && $mimeType !== ''
             ? $mimeType

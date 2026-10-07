@@ -35,11 +35,11 @@ final class FileMagicServiceProvider extends ServiceProvider
         }
 
         $this->publishes([
-            __DIR__ . '/../config/file-magic.php' => \config_path('file-magic.php'),
+            __DIR__ . '/../config/file-magic.php' => config_path('file-magic.php'),
         ], 'file-magic-config');
 
         $this->publishes([
-            __DIR__ . '/../database/migrations/create_stored_files_table.php.stub' => \database_path("migrations/{$timestamp}_create_stored_files_table.php"),
+            __DIR__ . '/../database/migrations/create_stored_files_table.php.stub' => database_path("migrations/{$timestamp}_create_stored_files_table.php"),
         ], 'file-magic-migrations');
     }
 }

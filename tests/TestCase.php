@@ -64,6 +64,9 @@ abstract class TestCase extends Orchestra
         return $pendingCommand;
     }
 
+    /**
+     * Return the initialized Testbench application.
+     */
     protected function application(): Application
     {
         \assert($this->app instanceof Application);

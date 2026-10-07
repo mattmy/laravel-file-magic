@@ -23,6 +23,8 @@ final readonly class ContentFileSource implements FileSource
      * Copy the content into a seekable temporary stream.
      *
      * @return resource
+     *
+     * @throws InvalidFileSource
      */
     #[Override]
     public function openStream()

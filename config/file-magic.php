@@ -4,9 +4,9 @@ declare(strict_types=1);
 use Mattmy\FileMagic\Models\StoredFile;
 
 return [
-    'disk' => \env('FILE_MAGIC_DISK', \env('FILESYSTEM_DISK', 'local')),
-    'directory' => \env('FILE_MAGIC_DIRECTORY', 'files'),
-    'visibility' => \env('FILE_MAGIC_VISIBILITY', 'private'),
+    'disk' => env('FILE_MAGIC_DISK', env('FILESYSTEM_DISK', 'local')),
+    'directory' => env('FILE_MAGIC_DIRECTORY', 'files'),
+    'visibility' => env('FILE_MAGIC_VISIBILITY', 'private'),
     'max_size' => 100 * 1024 * 1024,
     'allowed_mime_types' => [],
     'blocked_mime_types' => [
