@@ -13,7 +13,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create((string) \config('file-magic.table', 'stored_files'), function (Blueprint $table): void {
+        Schema::create((string) config('file-magic.table', 'stored_files'), function (Blueprint $table): void {
             $table->id();
             $table->uuid('uuid')->unique();
             $table->string('disk');
@@ -40,6 +40,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists((string) \config('file-magic.table', 'stored_files'));
+        Schema::dropIfExists((string) config('file-magic.table', 'stored_files'));
     }
 };
