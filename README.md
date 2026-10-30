@@ -26,8 +26,8 @@ files without building the same workflow for every source.
 - PHP `ext-fileinfo`
 - A configured Laravel Filesystem disk
 
-Remote files need PHP `ext-curl`. Image resizing needs Intervention Image 4 with GD or
-Imagick. ZIP downloads need PHP `ext-zip`.
+Remote files need PHP `ext-curl`. Image resizing additionally needs `intervention/image` 4.x
+and PHP GD or Imagick. ZIP downloads need PHP `ext-zip`.
 
 ## Installation
 
@@ -36,6 +36,12 @@ composer require mattmy/laravel-file-magic
 php artisan vendor:publish --tag=file-magic-config
 php artisan vendor:publish --tag=file-magic-migrations
 php artisan migrate
+```
+
+If you need image resizing, also install Intervention Image 4 and enable PHP GD or Imagick:
+
+```bash
+composer require intervention/image:^4.0
 ```
 
 ## Quick start

@@ -26,7 +26,7 @@
 - PHP `ext-fileinfo`
 - 至少一個設定完成的 Laravel Filesystem disk
 
-遠端檔案需要 PHP `ext-curl`；圖片縮放需要 Intervention Image 4 搭配 GD 或 Imagick；
+遠端檔案需要 PHP `ext-curl`；圖片縮放功能另外需要 `intervention/image` 4.x 與 PHP GD 或 Imagick；
 ZIP 下載需要 PHP `ext-zip`。
 
 ## 安裝
@@ -36,6 +36,12 @@ composer require mattmy/laravel-file-magic
 php artisan vendor:publish --tag=file-magic-config
 php artisan vendor:publish --tag=file-magic-migrations
 php artisan migrate
+```
+
+如果需要圖片縮放功能，請另外安裝 Intervention Image 4，並啟用 PHP GD 或 Imagick：
+
+```bash
+composer require intervention/image:^4.0
 ```
 
 ## 快速開始
