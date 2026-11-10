@@ -90,13 +90,10 @@ it('captures an original source once when unique collision retries a path', func
 });
 
 it('processes images from a captured source without reopening the original', function (): void {
-    $contents = \base64_decode(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-        true,
-    );
+    $contents = \file_get_contents(__DIR__ . '/../Fixtures/pixel.png');
 
     if ($contents === false) {
-        throw new RuntimeException('The image fixture could not be decoded.');
+        throw new RuntimeException('The image fixture could not be read.');
     }
 
     $source = new ChangingSnapshotSource($contents, 'replacement');
