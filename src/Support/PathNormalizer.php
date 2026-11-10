@@ -89,7 +89,7 @@ final class PathNormalizer
     private function unsafeSegment(string $segment, bool $allowLeadingDot): bool
     {
         $stem = \explode('.', $segment, 2)[0];
-        $unsafeCharacters = \preg_match('/[<>:"\/\\\\|?*\x00-\x1F\x7F]/u', $segment);
+        $unsafeCharacters = \preg_match('/[<>:"\/\\\\|?*\p{Cc}]/u', $segment);
 
         return $segment === '' ||
             $segment === '.' ||
@@ -98,7 +98,6 @@ final class PathNormalizer
             $unsafeCharacters !== 0 ||
             ($allowLeadingDot === false && \str_starts_with($segment, '.')) ||
             \str_ends_with($segment, '.') ||
-            \str_ends_with($segment, ' ') ||
             \in_array(\strtoupper($stem), self::RESERVED_NAMES, true);
     }
 }

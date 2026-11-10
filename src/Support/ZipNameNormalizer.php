@@ -45,7 +45,7 @@ final readonly class ZipNameNormalizer
     public function entryName(string $name, string $fallback): string
     {
         $name = \basename(\str_replace('\\', '/', $name));
-        $name = \preg_replace('/[<>:"\/\\\\|?*\x00-\x1F]/u', '_', $name);
+        $name = \preg_replace('/[<>:"\/\\\\|?*\p{Cc}]/u', '_', $name);
 
         if ($name === null) {
             throw new InvalidFileName('The archive entry name contains invalid UTF-8.');

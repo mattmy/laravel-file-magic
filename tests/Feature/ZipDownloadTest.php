@@ -81,23 +81,26 @@ it('does not duplicate a supplied ZIP extension', function (): void {
     expect(\is_file($archivePath))->toBeFalse();
 });
 
-it('removes source paths from archive entry names', function (): void {
+it('sanitizes archive entry names independently of stored metadata', function (string $originalName, string $entryName): void {
     $file = FileMagic::fromContent('contents', 'document.txt')->store();
-    $file->forceFill(['original_filename' => '../../private/document.txt'])->save();
+    $file->forceFill(['original_filename' => $originalName])->save();
     $response = FileMagic::find($file)->downloadZip('safe-entries');
     $archivePath = $response->getFile()->getPathname();
     $archive = new ZipArchive();
 
     expect($archive->open($archivePath))->toBeTrue()
         ->and($archive->numFiles)->toBe(1)
-        ->and($archive->getNameIndex(0))->toBe('document.txt');
+        ->and($archive->getNameIndex(0))->toBe($entryName);
 
     $archive->close();
 
     \ob_start();
     $response->sendContent();
     \ob_end_clean();
-});
+})->with([
+    'source directories' => ['../../private/document.txt', 'document.txt'],
+    'controls in the extension' => ["document.tx\x7F\u{0085}t", 'document.tx__t'],
+]);
 
 it('rejects unsafe ZIP download names', function (): void {
     $file = FileMagic::fromContent('contents')->store();

@@ -34,21 +34,21 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
     public function __construct(string $base64, private readonly ?string $originalFilename = null)
     {
         [$encoded, $mimeType] = $this->parse($base64);
+        $length = \strlen($encoded);
+        $alphabetLength = \strspn($encoded, self::ALPHABET);
+        $padding = $length - $alphabetLength;
 
         if (
-            \preg_match(
-                '/\A(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?\z/',
-                $encoded,
-            ) !== 1 ||
-            $this->hasNonCanonicalFinalQuantum($encoded)
+            $length % 4 !== 0 ||
+            $padding > 2 ||
+            \strspn($encoded, '=', $alphabetLength) !== $padding ||
+            $this->hasNonCanonicalFinalQuantum($encoded, $padding)
         ) {
             throw new InvalidBase64('The value is not valid canonical Base64.');
         }
 
-        $padding = \str_ends_with($encoded, '==') ? 2 : (\str_ends_with($encoded, '=') ? 1 : 0);
-
         $this->encoded = $encoded;
-        $this->decodedSize = \intdiv(\strlen($encoded), 4) * 3 - $padding;
+        $this->decodedSize = \intdiv($length, 4) * 3 - $padding;
         $this->mimeType = $mimeType;
     }
 
@@ -161,18 +161,16 @@ final class Base64FileSource implements FileSource, SizeLimitedFileSource
     /**
      * Determine whether the padded final quantum uses non-zero discarded bits.
      */
-    private function hasNonCanonicalFinalQuantum(string $encoded): bool
+    private function hasNonCanonicalFinalQuantum(string $encoded, int $padding): bool
     {
-        if ($encoded === '' || \str_ends_with($encoded, '=') === false) {
+        if ($padding === 0) {
             return false;
         }
 
-        $character = \str_ends_with($encoded, '==')
-            ? $encoded[\strlen($encoded) - 3]
-            : $encoded[\strlen($encoded) - 2];
+        $character = $encoded[\strlen($encoded) - $padding - 1];
         $value = \strpos(self::ALPHABET, $character);
 
-        return $value === false || ($value & (\str_ends_with($encoded, '==') ? 15 : 3)) !== 0;
+        return $value === false || ($value & ($padding === 2 ? 15 : 3)) !== 0;
     }
 
     /**

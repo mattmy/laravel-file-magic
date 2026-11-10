@@ -447,7 +447,7 @@ final readonly class StoreFile
         }
 
         $basename = \basename(\str_replace('\\', '/', $originalFilename));
-        $basename = \preg_replace('/[\x00-\x1F\x7F]/u', '', $basename);
+        $basename = \preg_replace('/\p{Cc}/u', '', $basename);
 
         return $basename === null || $basename === '' ? null : \mb_substr($basename, 0, 255);
     }
