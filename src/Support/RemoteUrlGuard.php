@@ -92,13 +92,17 @@ final readonly class RemoteUrlGuard
     }
 
     /**
-     * Normalize and validate a URL hostname or IP literal.
+     * Normalize and validate a URL hostname or IPv4 literal.
      */
     private function normalizeHost(string $host): string
     {
-        $host = \strtolower(\trim($host, '[]'));
+        if (\str_starts_with($host, '[')) {
+            throw new InvalidRemoteUrl('Use a hostname instead of an IPv6 address in the remote URL.');
+        }
 
-        if (\filter_var($host, \FILTER_VALIDATE_IP) !== false) {
+        $host = \strtolower($host);
+
+        if (\filter_var($host, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV4) !== false) {
             return $host;
         }
 

@@ -6,6 +6,15 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ## [Unreleased]
 
+## [0.6.2]
+
+### Fixed
+
+- Accept large canonical Base64 inputs without hitting the regular expression stack limit.
+- Reject Unicode control characters in storage paths and sanitize them in original and ZIP entry names.
+- Reject IPv6 literals in remote URLs during validation while allowing public IPv6 addresses
+  resolved from hostnames.
+
 ## [0.6.1] - 2026-10-07
 
 ### Fixed
@@ -152,7 +161,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 - Preservation of database records when storage state cannot be confirmed
   during deletion or consistency auditing.
 
-[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/mattmy/laravel-file-magic/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/mattmy/laravel-file-magic/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/mattmy/laravel-file-magic/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/mattmy/laravel-file-magic/compare/v0.4.0...v0.5.0

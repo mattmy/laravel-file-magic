@@ -101,6 +101,19 @@ it('accepts Base64 whose decoded bytes equal the operation limit', function (): 
         ->and($file->size)->toBe(6);
 });
 
+it('stores large canonical Base64 at the decoded byte limit', function (string $prefix): void {
+    $contents = \str_repeat('x', 1024 * 1024);
+    $file = FileMagic::fromBase64($prefix . \base64_encode($contents))
+        ->maxSize(\strlen($contents))
+        ->store();
+
+    expect($file->size)->toBe(\strlen($contents))
+        ->and($file->contents())->toBe($contents);
+})->with([
+    'plain Base64' => [''],
+    'data URI' => ['data:text/plain;base64,'],
+]);
+
 it('stores canonical plain and data URI Base64 values', function (string $value, string $expected): void {
     $file = FileMagic::fromBase64($value)->store();
 
@@ -149,6 +162,13 @@ it('rejects non-canonical Base64 during source creation', function (string $valu
     'misplaced padding' => ['M=TI'],
     'invalid padded bits' => ['MR=='],
     'non-quantized length' => ['MTI'],
+])->throws(InvalidBase64::class);
+
+it('rejects Base64 Data URIs without a MIME type or with MIME parameters', function (string $value): void {
+    FileMagic::fromBase64($value);
+})->with([
+    'missing MIME type' => ['data:;base64,SGVsbG8='],
+    'charset parameter' => ['data:text/plain;charset=UTF-8;base64,SGVsbG8='],
 ])->throws(InvalidBase64::class);
 
 it('lets an operation Base64 limit override the global limit', function (): void {
@@ -321,6 +341,7 @@ it('rejects non-canonical storage directories before storage', function (string 
     'reserved segment' => ['CON/files'],
     'delete control' => ["nested/\x7F"],
     'C0 control' => ["nested/\x1F"],
+    'C1 control' => ["nested/\u{0085}"],
     'invalid UTF-8' => ["nested/\xC3\x28"],
     'unsafe character' => ['nested:directory'],
     'dot segment' => ['nested/./directory'],
@@ -345,12 +366,19 @@ it('rejects non-canonical storage filenames before storage', function (string $f
     'forward slash' => ['nested/report'],
     'delete control' => ["report\x7F"],
     'C0 control' => ["report\x1F"],
+    'C1 control' => ["report\u{0085}"],
     'invalid UTF-8' => ["report\xC3\x28"],
     'leading dot' => ['.report'],
     'null byte' => ["report\0"],
     'unsafe character' => ['report?'],
     'trailing dot' => ['report.'],
 ]);
+
+it('strips Unicode control characters from the original filename', function (): void {
+    $file = FileMagic::fromContent('contents', "nested/report\u{0085}.txt")->store();
+
+    expect($file->originalName())->toBe('report.txt');
+});
 
 it('stores an empty directory at the disk root without a leading slash', function (): void {
     $file = FileMagic::fromContent('contents')

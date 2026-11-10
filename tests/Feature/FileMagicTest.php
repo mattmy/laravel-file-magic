@@ -138,13 +138,10 @@ it('does not trust a MIME hint supplied to ordinary content', function (): void 
 });
 
 it('resizes an image with Intervention Image 4', function (): void {
-    $contents = \base64_decode(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-        true,
-    );
+    $contents = \file_get_contents(__DIR__ . '/../Fixtures/pixel.png');
 
     if ($contents === false) {
-        throw new RuntimeException('The image fixture could not be decoded.');
+        throw new RuntimeException('The image fixture could not be read.');
     }
 
     $file = FileMagic::fromContent($contents, 'pixel.png', 'image/png')

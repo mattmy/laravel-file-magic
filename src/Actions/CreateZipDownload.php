@@ -74,11 +74,11 @@ final readonly class CreateZipDownload
                 $archive->close();
             }
 
-            $this->deleteTemporaryFiles($entryPaths);
-
             if ($preserveArchive === false) {
-                $this->deleteTemporaryFiles([$archivePath]);
+                $entryPaths[] = $archivePath;
             }
+
+            (new Filesystem())->delete($entryPaths);
         }
     }
 
@@ -182,7 +182,7 @@ final readonly class CreateZipDownload
                 $usedNames[\strtolower($entryName)] = true;
             }
         } catch (Throwable $exception) {
-            $this->deleteTemporaryFiles($entryPaths);
+            (new Filesystem())->delete($entryPaths);
 
             throw $exception;
         }
@@ -275,19 +275,5 @@ final readonly class CreateZipDownload
         $response->deleteFileAfterSend(true);
 
         return $response;
-    }
-
-    /**
-     * Delete temporary paths when they still exist.
-     *
-     * @param  list<string>  $paths
-     */
-    private function deleteTemporaryFiles(array $paths): void
-    {
-        $filesystem = new Filesystem();
-
-        foreach ($paths as $path) {
-            $filesystem->delete($path);
-        }
     }
 }

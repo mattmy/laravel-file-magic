@@ -99,7 +99,7 @@ it('rejects non-global IPv6 addresses including every IPv4-mapped address', func
     'invalid IPv6' => '2001:gggg::1',
 ]);
 
-it('allows ordinary public IPv6 addresses', function (): void {
+it('allows public IPv6 addresses resolved from a hostname', function (): void {
     $guard = new RemoteUrlGuard(new FakeHostResolver([
         'public.example.com' => ['2001:4860:4860::8888'],
     ]));
@@ -107,6 +107,15 @@ it('allows ordinary public IPv6 addresses', function (): void {
     $endpoint = $guard->validate('https://public.example.com/file.txt', new RemoteFileOptions());
 
     expect($endpoint->ipAddress)->toBe('2001:4860:4860::8888');
+});
+
+it('rejects an IPv6 literal in a remote URL before resolving the host', function (): void {
+    $guard = $this->application()->make(RemoteUrlGuard::class);
+
+    expect(static fn () => $guard->validate('https://[2001:4860:4860::8888]/file.txt', new RemoteFileOptions()))
+        ->toThrow(InvalidRemoteUrl::class);
+
+    expect($this->hostResolver->resolvedHosts)->toBe([]);
 });
 
 it('canonicalizes a trailing-dot hostname before resolving and pinning it', function (): void {
