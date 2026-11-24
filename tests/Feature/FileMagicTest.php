@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -181,6 +182,16 @@ it('keeps sources that Intervention Image cannot decode', function (): void {
     expect($result)->toBe($source);
 });
 
+it('resizes BMP content provided with an equivalent MIME type', function (string $mimeType): void {
+    $bitmap = \base64_decode('Qk0+AAAAAAAAADYAAAAoAAAAAgAAAAEAAAABABgAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAD//wAAAAA=');
+    $file = FileMagic::fromGeneratedContent($bitmap, 'bitmap.bmp', $mimeType)
+        ->resizeImage(maxWidth: 1)
+        ->store();
+    $dimensions = \getimagesizefromstring($file->contents());
+
+    expect($dimensions[0] ?? null)->toBe(1);
+})->with(['image/x-bmp', 'image/x-ms-bmp']);
+
 it('rejects path traversal', function (): void {
     FileMagic::fromContent('unsafe')
         ->inDirectory('../private')
@@ -241,4 +252,26 @@ it('resolves uppercase UUID targets once and deduplicates mixed identities', fun
     expect($query->get())->toHaveCount(2)
         ->and($query->one()?->getKey())->toBe($file->getKey())
         ->and($queries)->toBe(1);
+});
+
+it('resolves canonical targets when a model scope joins another table with the same columns', function (): void {
+    $model = new class() extends StoredFile
+    {
+        /**
+         * Join a second record so both query sources expose ID and UUID.
+         */
+        #[Override]
+        protected static function booted(): void
+        {
+            self::addGlobalScope('joined', static function (Builder $query): void {
+                $query->join('stored_files as related', 'related.id', '<>', 'stored_files.id');
+            });
+        }
+    };
+    config()->set('file-magic.model', $model::class);
+    $first = FileMagic::fromContent('first')->store();
+    $second = FileMagic::fromContent('second')->store();
+
+    expect(FileMagic::find($second->uuid, $first->id)->get()->pluck('id')->all())
+        ->toBe([$second->id, $first->id]);
 });

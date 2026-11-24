@@ -63,7 +63,7 @@ final class FileQuery
      */
     public function get(): Collection
     {
-        return $this->resolve()->toBase()->values();
+        return $this->resolve()->toBase();
     }
 
     /**

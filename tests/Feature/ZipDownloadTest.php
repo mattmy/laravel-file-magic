@@ -136,8 +136,9 @@ it('enforces the actual streamed size when stored metadata is stale', function (
 })->throws(ZipLimitExceeded::class);
 
 it('fails the entire ZIP download when a physical file is missing', function (): void {
+    $readable = FileMagic::fromContent('readable')->store();
     $file = FileMagic::fromContent('contents')->store();
     Storage::disk('testing')->delete($file->path);
 
-    FileMagic::find($file)->downloadZip();
+    FileMagic::find($readable, $file)->downloadZip();
 })->throws(FileNotFound::class);

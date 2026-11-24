@@ -6,6 +6,19 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ## [Unreleased]
 
+## [0.6.3]
+
+### Fixed
+
+- Let read-only audits work with Eloquent strict attribute checking and skip default eager loads during audits.
+- Resolve file targets correctly when a custom model's global scope joins tables with the same column names.
+- Preserve the original ZIP download error and clean up temporary files when a later entry cannot be read.
+- Resize BMP files identified as `image/x-bmp` or `image/x-ms-bmp`.
+
+### Changed
+
+- Reuse path segment validation and remove redundant enum conversions and collection reindexing.
+
 ## [0.6.2]
 
 ### Fixed
@@ -161,7 +174,8 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 - Preservation of database records when storage state cannot be confirmed
   during deletion or consistency auditing.
 
-[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/mattmy/laravel-file-magic/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/mattmy/laravel-file-magic/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/mattmy/laravel-file-magic/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/mattmy/laravel-file-magic/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/mattmy/laravel-file-magic/compare/v0.5.0...v0.6.0

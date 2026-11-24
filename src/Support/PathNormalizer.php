@@ -47,15 +47,6 @@ final class PathNormalizer
             return '';
         }
 
-        if (
-            \str_starts_with($directory, '/') ||
-            \str_ends_with($directory, '/') ||
-            \str_contains($directory, '//') ||
-            \str_contains($directory, '\\')
-        ) {
-            throw new InvalidStoragePath('The storage directory must be a safe relative path.');
-        }
-
         foreach (\explode('/', $directory) as $segment) {
             if ($this->unsafeSegment($segment, allowLeadingDot: true)) {
                 throw new InvalidStoragePath('The storage directory must be a safe relative path.');

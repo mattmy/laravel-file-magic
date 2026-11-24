@@ -219,12 +219,13 @@ final readonly class FileMagicConfig
     public function visibility(): FileVisibility
     {
         $visibility = $this->config->get('file-magic.visibility', FileVisibility::Private->value);
+        $visibility = \is_string($visibility) ? FileVisibility::tryFrom($visibility) : null;
 
-        if (\is_string($visibility) === false || FileVisibility::tryFrom($visibility) === null) {
+        if ($visibility === null) {
             $this->invalid('file-magic.visibility', '[public] or [private]');
         }
 
-        return FileVisibility::from($visibility);
+        return $visibility;
     }
 
     /**
@@ -233,12 +234,13 @@ final readonly class FileMagicConfig
     public function collisionPolicy(): CollisionPolicy
     {
         $policy = $this->config->get('file-magic.collision', CollisionPolicy::Unique->value);
+        $policy = \is_string($policy) ? CollisionPolicy::tryFrom($policy) : null;
 
-        if (\is_string($policy) === false || CollisionPolicy::tryFrom($policy) === null) {
+        if ($policy === null) {
             $this->invalid('file-magic.collision', '[unique], [error], or [overwrite]');
         }
 
-        return CollisionPolicy::from($policy);
+        return $policy;
     }
 
     /**

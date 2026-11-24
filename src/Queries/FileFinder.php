@@ -133,20 +133,22 @@ final readonly class FileFinder
         }
 
         $modelClass = $this->models->resolve();
-        $keyName = (new $modelClass())->getKeyName();
+        $query = $modelClass::query();
+        $keyName = $query->getModel()->getQualifiedKeyName();
+        $uuid = $query->qualifyColumn('uuid');
 
-        return $modelClass::query()
-            ->where(function (Builder $query) use ($ids, $keyName, $uuids): void {
+        return $query
+            ->where(function (Builder $query) use ($ids, $keyName, $uuids, $uuid): void {
                 if ($ids !== []) {
                     $query->whereIn($keyName, \array_values(\array_unique($ids)));
                 }
 
                 if ($uuids !== []) {
                     $method = $ids === [] ? 'whereIn' : 'orWhereIn';
-                    $query->{$method}('uuid', \array_values(\array_unique($uuids)));
+                    $query->{$method}($uuid, \array_values(\array_unique($uuids)));
                 }
             })
-            ->get();
+            ->get([$query->qualifyColumn('*')]);
     }
 
     /**

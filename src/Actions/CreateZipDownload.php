@@ -57,7 +57,7 @@ final readonly class CreateZipDownload
         try {
             $this->openArchive($archive, $archivePath);
             $archiveOpened = true;
-            $entryPaths = $this->addFiles($archive, $files, $maximumSize);
+            $this->addFiles($archive, $files, $maximumSize, $entryPaths);
             $this->closeArchive($archive);
             $archiveOpened = false;
 
@@ -71,7 +71,12 @@ final readonly class CreateZipDownload
             throw new ZipCreationFailed('The ZIP archive could not be created.', previous: $exception);
         } finally {
             if ($archiveOpened) {
-                $archive->close();
+                try {
+                    $archive->unchangeAll();
+                    $archive->close();
+                } catch (Throwable) {
+                    // Preserve the original archive failure while removing temporary files.
+                }
             }
 
             if ($preserveArchive === false) {
@@ -159,35 +164,30 @@ final readonly class CreateZipDownload
      * Stream every stored file to a temporary entry and add it to the archive.
      *
      * @param  Collection<int, StoredFile>  $files
-     * @return list<string>
+     * @param  list<string>  $entryPaths  Temporary files owned by the caller until the archive closes.
      */
-    private function addFiles(ZipArchive $archive, Collection $files, int $maximumSize): array
-    {
-        $entryPaths = [];
+    private function addFiles(
+        ZipArchive $archive,
+        Collection $files,
+        int $maximumSize,
+        array &$entryPaths,
+    ): void {
         $usedNames = [];
         $writtenBytes = 0;
 
-        try {
-            foreach ($files as $file) {
-                $entryPath = $this->temporaryFile();
-                $entryPaths[] = $entryPath;
-                $writtenBytes = $this->copyFile($file, $entryPath, $writtenBytes, $maximumSize);
-                $entryName = $this->names->entryName($file->originalName(), $file->fullName());
-                $entryName = $this->names->uniqueEntryName($entryName, $usedNames);
+        foreach ($files as $file) {
+            $entryPath = $this->temporaryFile();
+            $entryPaths[] = $entryPath;
+            $writtenBytes = $this->copyFile($file, $entryPath, $writtenBytes, $maximumSize);
+            $entryName = $this->names->entryName($file->originalName(), $file->fullName());
+            $entryName = $this->names->uniqueEntryName($entryName, $usedNames);
 
-                if ($archive->addFile($entryPath, $entryName) === false) {
-                    throw new ZipCreationFailed("The archive entry [{$entryName}] could not be added.");
-                }
-
-                $usedNames[\strtolower($entryName)] = true;
+            if ($archive->addFile($entryPath, $entryName) === false) {
+                throw new ZipCreationFailed("The archive entry [{$entryName}] could not be added.");
             }
-        } catch (Throwable $exception) {
-            (new Filesystem())->delete($entryPaths);
 
-            throw $exception;
+            $usedNames[\strtolower($entryName)] = true;
         }
-
-        return $entryPaths;
     }
 
     /**
