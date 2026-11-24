@@ -182,6 +182,16 @@ it('keeps sources that Intervention Image cannot decode', function (): void {
     expect($result)->toBe($source);
 });
 
+it('resizes BMP content provided with an equivalent MIME type', function (string $mimeType): void {
+    $bitmap = \base64_decode('Qk0+AAAAAAAAADYAAAAoAAAAAgAAAAEAAAABABgAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAD//wAAAAA=');
+    $file = FileMagic::fromGeneratedContent($bitmap, 'bitmap.bmp', $mimeType)
+        ->resizeImage(maxWidth: 1)
+        ->store();
+    $dimensions = \getimagesizefromstring($file->contents());
+
+    expect($dimensions[0] ?? null)->toBe(1);
+})->with(['image/x-bmp', 'image/x-ms-bmp']);
+
 it('rejects path traversal', function (): void {
     FileMagic::fromContent('unsafe')
         ->inDirectory('../private')

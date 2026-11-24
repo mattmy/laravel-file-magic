@@ -17,12 +17,21 @@ use Mattmy\FileMagic\Sources\ContentFileSource;
 
 final class ImageProcessor
 {
+    private const array SUPPORTED_MIME_TYPES = [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'image/bmp',
+        'image/x-bmp',
+        'image/x-ms-bmp',
+    ];
+
     /**
      * Resize and encode a supported raster image.
      */
     public function process(FileSource $source, string $mimeType, ImageOptions $options): FileSource
     {
-        if (\in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp', 'image/bmp'], true) === false) {
+        if (\in_array($mimeType, self::SUPPORTED_MIME_TYPES, true) === false) {
             return $source;
         }
 
