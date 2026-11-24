@@ -8,6 +8,7 @@ use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
@@ -51,6 +52,24 @@ it('reports missing records without changing the database', function (): void {
         ->assertExitCode(1);
 
     expect($file->fresh())->not->toBeNull();
+});
+
+it('audits configured models without reading unselected attributes or owners', function (): void {
+    $model = new class() extends StoredFile
+    {
+        /** @var list<string> */
+        protected $with = ['owner'];
+    };
+    config()->set('file-magic.model', $model::class);
+    FileMagic::fromContent('healthy')->store();
+    $previous = Model::preventsAccessingMissingAttributes();
+    Model::preventAccessingMissingAttributes();
+
+    try {
+        $this->artisan('file-magic:audit')->assertExitCode(0);
+    } finally {
+        Model::preventAccessingMissingAttributes($previous);
+    }
 });
 
 it('keeps unknown records and performs exactly one existence check per record', function (): void {

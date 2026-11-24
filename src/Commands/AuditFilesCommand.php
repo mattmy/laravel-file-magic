@@ -243,7 +243,7 @@ final class AuditFilesCommand extends Command
             $columns[] = 'location_hash';
         }
 
-        $query = $model->newQueryWithoutScopes()->select($columns);
+        $query = $model->newQueryWithoutScopes()->withoutEagerLoads()->select($columns);
 
         if ($disk !== null) {
             $query->where('disk', $disk);
@@ -295,7 +295,7 @@ final class AuditFilesCommand extends Command
         $key = $this->modelKey($file);
         $disk = $file->getAttribute('disk');
         $path = $file->getAttribute('path');
-        $locationHash = $file->getAttribute('location_hash');
+        $locationHash = $deleteMissingRecords ? $file->getAttribute('location_hash') : null;
 
         if (
             \is_string($disk) === false ||
@@ -399,8 +399,10 @@ final class AuditFilesCommand extends Command
     private function cleanMissingRecordsWhileLocked(StoredFile $model, array $candidates): int
     {
         $current = $model->newQueryWithoutScopes()
+            ->withoutEagerLoads()
             ->whereKey(\array_column($candidates, 'key'))
-            ->get([$model->getKeyName(), 'disk', 'path', 'location_hash']);
+            ->select([$model->getKeyName(), 'disk', 'path', 'location_hash'])
+            ->get();
         $byKey = [];
 
         foreach ($current as $file) {
