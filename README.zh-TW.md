@@ -2,29 +2,25 @@
 
 [English](README.md)
 
-透過清楚一致的 API 在 Laravel 管理檔案。FileMagic 使用 Eloquent 保存檔案紀錄，
-並支援 Laravel Filesystem disks，讓你不必針對每種來源重複開發儲存、查詢、讀取、
-下載與刪除流程。
+FileMagic 將檔案存到 Laravel Filesystem 磁碟，並回傳一筆 Eloquent `StoredFile` 紀錄。
+要讀取、下載或刪除檔案時，可用 `FileMagic::find()` 查詢。
 
 ## 可以做什麼
 
 - 儲存上傳檔案、本機檔案、字串內容、Base64 與遠端 HTTP(S) 檔案。
-- 產生並儲存 TXT、JSON、CSV，以及具有可信任 MIME type 的應用程式產物。
-- 為每個檔案選擇 disk、目錄、檔名、visibility 與檔名碰撞處理方式。
-- 限制檔案大小，並允許或封鎖指定 MIME types。
-- 加入 metadata，並將檔案關聯至 Eloquent Model。
-- 在儲存前縮小支援的圖片。
-- 透過 ID、UUID、Model、array 或 Laravel Collection 尋找檔案。
-- 讀取內容、開啟 stream、產生 URL 與回傳下載。
-- 將多個檔案下載為 ZIP，或批次刪除檔案。
-- 稽核已經找不到實體檔案的 database records。
+- 產生 TXT、JSON 或 CSV，也能用可信任的 MIME 類型儲存應用程式自行產生的內容。
+- 限制檔案大小與 MIME 類型、設定檔名衝突的處理方式，以及縮小支援的圖片。
+- 附加中繼資料，並將檔案關聯至 Eloquent Model。
+- 用 ID、UUID 或 Model 查詢。批次查詢可傳入陣列或 Laravel Collection。
+- 產生檔案網址、將多個檔案打包成 ZIP 下載，或批次刪除檔案。
+- 稽核哪些資料庫紀錄對應的檔案已遺失。
 
 ## 系統需求
 
-- PHP 8.3 或以上
+- PHP 8.3–8.x
 - Laravel 12 或 13
 - PHP `ext-fileinfo`
-- 至少一個設定完成的 Laravel Filesystem disk
+- 至少一個已設定的 Laravel Filesystem 磁碟及資料庫連線
 
 遠端檔案需要 PHP `ext-curl`；圖片縮放功能另外需要 `intervention/image` 4.x 與 PHP GD 或 Imagick；
 ZIP 下載需要 PHP `ext-zip`。
@@ -33,10 +29,11 @@ ZIP 下載需要 PHP `ext-zip`。
 
 ```bash
 composer require mattmy/laravel-file-magic
-php artisan vendor:publish --tag=file-magic-config
 php artisan vendor:publish --tag=file-magic-migrations
 php artisan migrate
 ```
+
+要調整預設值時，可執行 `php artisan vendor:publish --tag=file-magic-config` 發布設定檔。
 
 如果需要圖片縮放功能，請另外安裝 Intervention Image 4，並啟用 PHP GD 或 Imagick：
 
@@ -45,6 +42,8 @@ composer require intervention/image:^4.0
 ```
 
 ## 快速開始
+
+使用這段範例前，請先驗證上傳檔案並檢查使用者的權限。
 
 ```php
 use Mattmy\FileMagic\Facades\FileMagic;
@@ -77,13 +76,17 @@ FileMagic::json(['status' => 'ready'])->named('status')->store();
 FileMagic::csv($rows)->named('report')->store();
 ```
 
+`fromContent()` 會從內容偵測 MIME 類型。使用 `fromGeneratedContent()` 時，只有 Symfony 找得到
+對應副檔名，FileMagic 才會採用傳入的 MIME 類型。請只在應用程式能保證內容格式時指定可信任的 MIME 類型。
+若省略 MIME 類型或找不到對應的副檔名，FileMagic 會改用 `fromContent()` 偵測內容。
+
 ```php
 // 不安全：bytes 與 MIME type 都不是由應用程式控制。
 FileMagic::fromGeneratedContent($request->getContent(), null, $request->header('Content-Type'));
 ```
 
-完整 `$contents` 字串在呼叫前就已位於 PHP 記憶體。產物可能接近 worker 記憶體上限時，請改用
-upload、path 或 remote source。
+要儲存 HTTP 請求的原始內容，請用 `fromContent($request->getContent())`。這兩個方法都會接收
+已存在於 PHP 記憶體的完整 `$contents` 字串。大型檔案請依來源改用上傳、本機路徑或網址。
 
 ## 設定檔案
 
@@ -104,7 +107,10 @@ $file = FileMagic::fromUpload($uploadedFile)
     ->store();
 ```
 
-需要在儲存前縮小支援的圖片時，可以使用 `resizeImage()`：
+`named()` 會保留檔名主體中的點號，再依 MIME 類型附加副檔名。例如純文字檔指定 `report.txt` 時，
+在檔名未被占用的情況下會儲存為 `report.txt.txt`。
+
+要在儲存前縮小支援的圖片，可使用 `resizeImage()`。
 
 ```php
 $image = FileMagic::fromUpload($uploadedImage)
@@ -127,11 +133,13 @@ $stream = FileMagic::find($uuid)->readStream();
 return FileMagic::find($uuid)->download();
 ```
 
-大型檔案請使用 `readStream()`，不要使用 `contents()`；使用完畢後必須關閉回傳的 stream。
+對同一批目標執行多個操作時，可沿用同一個 `FileQuery`。大型檔案請用 `readStream()`，用完後要關閉串流。
+`contents()` 會把整個檔案讀進記憶體。
 
 ## 安全性與資源限制
 
-套件設定會被嚴格驗證。Base64 輸入會在解碼前依解碼後的大小拒絕，之後以有界線的區塊解碼至暫存 stream：編碼後輸入保留於記憶體，解碼後的 bytes 使用暫存磁碟空間。儲存路徑必須事先是 canonical 形式，而圖片的大小與 MIME 政策會在處理前後都檢查。
+FileMagic 會在解碼前檢查 Base64 解碼後的大小。編碼字串留在記憶體，解碼結果則分段寫入暫存檔。
+儲存路徑須為以 `/` 分隔的相對路徑。圖片處理前會檢查大小和 MIME 類型，輸出有變更時會再檢查一次。
 
 ## ZIP 下載與刪除
 
@@ -143,21 +151,19 @@ return FileMagic::find($targets)->downloadZip('documents');
 $deleted = FileMagic::find($targets)->delete();
 ```
 
-應用程式必須先確認使用者有權限操作每個要讀取、下載或刪除的檔案。
-啟用 collision lock 時，儲存、`FileQuery::delete()` 與 audit cleanup 會協調相同 storage path；
-direct `StoredFile::delete()` 與外部 mutation 不在此保證範圍。
+應用程式須檢查每次操作的權限，包括 ZIP 內的每個檔案。啟用路徑鎖定後，儲存、批次刪除與稽核清理
+會透過同一個快取後端，在鎖的有效期限內協調。直接呼叫 `StoredFile::delete()` 或從外部寫入時不會使用這些鎖。
 
 ## 一致性稽核
 
-檢查 database record 在 storage 上是否仍有對應檔案：
+檢查資料庫紀錄對應的檔案是否仍存在。
 
 ```bash
 php artisan file-magic:audit
 ```
 
-除非加上 `--delete-missing-records`，否則指令不會修改資料。Cleanup 會在鎖內重新確認 record
-identity，並在刪除前再次檢查 storage。遠端 disk 可能增加網路
-等待時間與 storage request 費用，排程清理前請先閱讀稽核文件。
+稽核預設為唯讀。加上 `--delete-missing-records` 後，會重新核對紀錄與檔案，確認檔案仍遺失才刪除紀錄。
+啟用路徑鎖定時，這些檢查會在鎖內進行。使用遠端磁碟時，每次確認檔案是否存在都可能增加等待時間與請求費用。
 
 ## 處理錯誤
 
@@ -175,8 +181,7 @@ try {
 
 ## 完整文件
 
-所有方法、欄位、參數、例外、設定、效能及安全注意事項，請參考
-[FileMagic 繁體中文文件](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/)。
+操作指南與 API 參考請見 [FileMagic 繁體中文文件](https://mattmy.github.io/laravel-file-magic-docs/zh-TW/)。
 
 安全性問題請依照 [SECURITY.md](SECURITY.md) 私下回報。
 
