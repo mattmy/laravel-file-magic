@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Enums\FileVisibility;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
+use Mattmy\FileMagic\Support\PathNormalizer;
 use Override;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -187,7 +188,7 @@ class StoredFile extends Model
     {
         return $this->storage()->download(
             $this->path,
-            $name ?? $this->originalName(),
+            $name ?? PathNormalizer::originalFilename($this->originalName()) ?? $this->fullName(),
             ['Content-Type' => $this->mime_type],
         );
     }

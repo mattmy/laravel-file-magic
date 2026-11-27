@@ -34,6 +34,15 @@ it('stores and reads an uploaded file', function (): void {
     Storage::disk('testing')->assertExists($file->path);
 });
 
+it('sanitizes the original filename of an existing record for a download', function (): void {
+    $file = FileMagic::text('contents')->store();
+    $file->forceFill(['original_filename' => "archive\\report\x7F.txt"])->saveOrFail();
+
+    $response = FileMagic::find($file)->download();
+
+    expect($response->headers->get('Content-Disposition'))->toBe('attachment; filename=report.txt');
+});
+
 it('delegates generated content without a trusted MIME type to ordinary inspection', function (
     Closure $generatedFactory,
     Closure $contentFactory,
@@ -224,6 +233,41 @@ it('updates the record when overwriting a path', function (): void {
         ->and($replacement->contents())->toBe('new')
         ->and(StoredFile::query()->count())->toBe(1);
 });
+
+it('preserves or replaces optional record attributes when overwriting', /**
+ * @param  array<string, mixed>  $expectedMetadata
+ */ function (?string $source, bool $replaceOwner, array $expectedMetadata): void {
+    $owner = FileMagic::text('original owner')->store();
+    $otherOwner = FileMagic::text('replacement owner')->store();
+    $original = FileMagic::text('old contents')
+        ->named('same')
+        ->ownedBy($owner)
+        ->withMetadata(['source' => 'import', 'version' => 1])
+        ->store();
+    $pending = FileMagic::text('new contents')->named('same')->onCollision(CollisionPolicy::Overwrite);
+
+    if ($source !== null) {
+        $pending->withMetadata($source === '' ? [] : ['source' => $source]);
+    }
+
+    if ($replaceOwner) {
+        $pending->ownedBy($otherOwner);
+    }
+
+    $updated = $pending->store();
+    $file = StoredFile::query()->findOrFail($updated->id);
+
+    expect($file->id)->toBe($original->id)
+        ->and($file->uuid)->toBe($original->uuid)
+        ->and($file->contents())->toBe('new contents')
+        ->and($file->metadata)->toBe($expectedMetadata)
+        ->and($file->owner?->is($replaceOwner ? $otherOwner : $owner))->toBeTrue()
+        ->and($owner->metadata)->toBe([]);
+})->with([
+    'omitted options preserve both values' => [null, false, ['source' => 'import', 'version' => 1]],
+    'explicit options replace both values' => ['manual', true, ['source' => 'manual']],
+    'empty metadata clears the value' => ['', false, []],
+]);
 
 it('accepts variadic array collection and model targets in order', function (): void {
     $first = FileMagic::fromContent('first')->store();

@@ -11,6 +11,8 @@ final class PathNormalizer
 {
     public const int MAX_FILENAME_LENGTH = 200;
 
+    private const int MAX_ORIGINAL_FILENAME_LENGTH = 255;
+
     private const array RESERVED_NAMES = [
         'AUX',
         'CON',
@@ -72,6 +74,23 @@ final class PathNormalizer
         }
 
         return $filename;
+    }
+
+    /**
+     * Extract a display filename from optional source or stored metadata.
+     */
+    public static function originalFilename(?string $filename): ?string
+    {
+        if ($filename === null) {
+            return null;
+        }
+
+        $basename = \basename(\str_replace('\\', '/', $filename));
+        $basename = \preg_replace('/\p{Cc}/u', '', $basename);
+
+        return $basename === null || $basename === ''
+            ? null
+            : \mb_substr($basename, 0, self::MAX_ORIGINAL_FILENAME_LENGTH);
     }
 
     /**

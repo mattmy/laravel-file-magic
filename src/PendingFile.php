@@ -42,9 +42,9 @@ final class PendingFile
     private ?array $blockedMimeTypes = null;
 
     /**
-     * @var array<string, mixed>
+     * @var array<string, mixed>|null
      */
-    private array $metadata = [];
+    private ?array $metadata = null;
 
     private ?Model $owner = null;
 
@@ -86,7 +86,7 @@ final class PendingFile
     }
 
     /**
-     * Select a filename without an extension.
+     * Select a filename stem to which the detected extension will be appended.
      */
     public function named(string|int $filename): self
     {
@@ -294,7 +294,13 @@ final class PendingFile
      */
     public function metadata(): array
     {
-        return $this->metadata;
+        return $this->metadata ?? [];
+    }
+
+    /** Return whether the caller explicitly supplied metadata, including an empty array. */
+    public function hasMetadata(): bool
+    {
+        return $this->metadata !== null;
     }
 
     /** Return the configured owner. */

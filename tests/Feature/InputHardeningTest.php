@@ -49,6 +49,7 @@ it('rejects invalid store configuration before storage', function (string $key, 
 })->with([
     'empty disk' => ['file-magic.disk', ''],
     'non-string directory' => ['file-magic.directory', []],
+    'non-canonical directory' => ['file-magic.directory', 'documents//reports'],
     'string maximum size' => ['file-magic.max_size', '100'],
     'invalid visibility' => ['file-magic.visibility', 'private '],
     'invalid collision policy' => ['file-magic.collision', 'unique '],
