@@ -196,8 +196,10 @@ final readonly class DeleteFiles
 
         try {
             $current = $model->newQueryWithoutScopes()
+                ->withoutEagerLoads()
                 ->whereKey($keys)
-                ->get([$model->getKeyName(), 'disk', 'path', 'location_hash']);
+                ->select([$model->getKeyName(), 'disk', 'path', 'location_hash'])
+                ->get();
         } catch (Throwable $exception) {
             throw new FileRecordFailed(
                 'Stored-file records could not be revalidated before deletion.',
