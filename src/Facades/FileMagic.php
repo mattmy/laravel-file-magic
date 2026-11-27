@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic\Facades;
 
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Facade;
 use JsonSerializable;
 use Mattmy\FileMagic\Data\RemoteFileOptions;
 use Mattmy\FileMagic\FileMagic as FileMagicManager;
 use Mattmy\FileMagic\FileQuery;
-use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\PendingFile;
 use Override;
 
@@ -25,7 +23,7 @@ use Override;
  * @method static PendingFile text(string $text)
  * @method static PendingFile json(array<array-key, mixed>|JsonSerializable $data)
  * @method static PendingFile csv(iterable<array-key, array<array-key, scalar|null>> $rows)
- * @method static FileQuery find(int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, covariant int|string|StoredFile> ...$targets)
+ * @method static FileQuery find(mixed ...$targets)
  */
 final class FileMagic extends Facade
 {

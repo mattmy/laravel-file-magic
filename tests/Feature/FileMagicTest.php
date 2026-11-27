@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
+use Mattmy\FileMagic\Exceptions\InvalidFileTarget;
 use Mattmy\FileMagic\Exceptions\InvalidStoragePath;
 use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Models\StoredFile;
@@ -282,6 +283,38 @@ it('accepts variadic array collection and model targets in order', function (): 
         ->and($ids)->toBe([$second->id, $first->id])
         ->and(FileMagic::find($first)->one()?->getKey())->toBe($first->getKey())
         ->and(FileMagic::find([])->get()->isEmpty())->toBeTrue();
+});
+
+it('resolves decimal ID strings and skips invalid scalars in target order', function (): void {
+    $first = FileMagic::text('first')->store();
+    $second = FileMagic::text('second')->store();
+
+    $files = FileMagic::find(
+        '0' . $second->id,
+        [true, false, null, 0, -1, '', ' ', '1.0', '1e0', 'report.pdf', ' ' . $first->uuid],
+        collect([(string) $first->id, $second->id, $first->uuid]),
+    )->get();
+
+    expect($files->pluck('id')->all())->toBe([$second->id, $first->id]);
+});
+
+it('does not query or delete when all targets are invalid scalar values', function (): void {
+    $file = FileMagic::text('contents')->store();
+    $queries = 0;
+    DB::listen(static function () use (&$queries): void {
+        $queries++;
+    });
+
+    $query = FileMagic::find((float) $file->id, [1.5, \INF, \NAN], collect([\PHP_INT_MAX . '0']));
+
+    expect($query->one())->toBeNull()
+        ->and($query->delete())->toBe(0)
+        ->and($queries)->toBe(0);
+    Storage::disk('testing')->assertExists($file->path);
+});
+
+it('rejects nested target containers', function (): void {
+    expect(static fn () => FileMagic::find([[1]])->get())->toThrow(InvalidFileTarget::class);
 });
 
 it('resolves uppercase UUID targets once and deduplicates mixed identities', function (): void {

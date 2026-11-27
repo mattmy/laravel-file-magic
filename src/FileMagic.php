@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Mattmy\FileMagic;
 
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Collection as SupportCollection;
 use JsonSerializable;
 use Mattmy\FileMagic\Actions\CreateZipDownload;
 use Mattmy\FileMagic\Actions\DeleteFiles;
@@ -16,7 +15,6 @@ use Mattmy\FileMagic\Exceptions\InvalidBase64;
 use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
 use Mattmy\FileMagic\Exceptions\InvalidDocumentData;
 use Mattmy\FileMagic\Exceptions\InvalidFileSource;
-use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\Queries\FileFinder;
 use Mattmy\FileMagic\Sources\Base64FileSource;
 use Mattmy\FileMagic\Sources\ContentFileSource;
@@ -155,11 +153,9 @@ final class FileMagic
     }
 
     /**
-     * Begin a query for IDs, UUIDs, stored file models, arrays or Collections.
-     *
-     * @param  int|string|StoredFile|array<array-key, int|string|StoredFile>|SupportCollection<array-key, covariant int|string|StoredFile>  ...$targets
+     * Begin a query without coercing the supplied targets before validation.
      */
-    public function find(int|string|StoredFile|array|SupportCollection ...$targets): FileQuery
+    public function find(mixed ...$targets): FileQuery
     {
         return new FileQuery(
             $this->finder,
