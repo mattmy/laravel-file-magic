@@ -212,7 +212,7 @@ final readonly class CreateZipDownload
             while (\feof($source) === false) {
                 $chunk = \fread($source, self::COPY_CHUNK_BYTES);
 
-                if ($chunk === false) {
+                if ($chunk === false || ($chunk === '' && \feof($source) === false)) {
                     throw new FileNotFound('A stored file could not be read for the ZIP download.');
                 }
 

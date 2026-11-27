@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Exceptions\FileNotFound;
 use Mattmy\FileMagic\Exceptions\InvalidFileName;
@@ -142,3 +143,67 @@ it('fails the entire ZIP download when a physical file is missing', function ():
 
     FileMagic::find($readable, $file)->downloadZip();
 })->throws(FileNotFound::class);
+
+it('fails the ZIP download when an entry stream makes no progress before EOF', function (): void {
+    $file = FileMagic::text('contents')->store();
+    $wrapper = new class()
+    {
+        public static bool $closed = false;
+
+        /** @var resource|null */
+        public $context = null;
+
+        private int $reads = 0;
+
+        /** Open a stream that initially returns no bytes. */
+        public function stream_open(): bool
+        {
+            self::$closed = false;
+
+            return true;
+        }
+
+        /** Return no bytes and record the read attempt. */
+        public function stream_read(): string
+        {
+            $this->reads++;
+
+            return '';
+        }
+
+        /** Report EOF on the second read to keep the regression test bounded. */
+        public function stream_eof(): bool
+        {
+            return $this->reads >= 2;
+        }
+
+        /** Record that the source stream was closed. */
+        public function stream_close(): void
+        {
+            self::$closed = true;
+        }
+    };
+    expect(\stream_wrapper_register('filemagicemptyread', $wrapper::class))->toBeTrue();
+
+    try {
+        $stream = \fopen('filemagicemptyread://entry', 'rb');
+        \assert(\is_resource($stream));
+        $disk = Mockery::mock(FilesystemAdapter::class);
+        $disk->shouldReceive('readStream')->once()->with($file->path)->andReturn($stream);
+        Storage::shouldReceive('disk')->once()->with('testing')->andReturn($disk);
+
+        try {
+            expect(function () use ($file): void {
+                $response = FileMagic::find($file)->downloadZip();
+                \unlink($response->getFile()->getPathname());
+            })->toThrow(FileNotFound::class);
+            expect($wrapper::$closed)->toBeTrue();
+        } finally {
+            if ($wrapper::$closed === false) {
+                \fclose($stream);
+            }
+        }
+    } finally {
+        \stream_wrapper_unregister('filemagicemptyread');
+    }
+});
