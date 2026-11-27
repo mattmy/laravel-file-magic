@@ -6,6 +6,22 @@ follows [Semantic Versioning](https://semver.org/) and the structure of
 
 ## [Unreleased]
 
+## [0.7.0]
+
+### Changed
+
+- Resolve positive decimal ID strings in `find()` and skip invalid scalar targets, including floats and booleans.
+- Preserve existing metadata when overwriting without `withMetadata()`. Pass `withMetadata([])` to clear it.
+- Avoid reindexing validated CSV rows before writing, with unchanged CSV output.
+- Clarify installation, query reuse, and resource costs in both READMEs.
+
+### Fixed
+
+- Skip default eager loading when revalidating file identities for batch deletion.
+- Fail ZIP downloads when an entry stream returns no bytes before reaching EOF.
+- Sanitize stored original filenames before using them in download headers.
+- Report invalid default storage directories as configuration errors.
+
 ## [0.6.3]
 
 ### Fixed

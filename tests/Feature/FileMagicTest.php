@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Mattmy\FileMagic\Data\ImageOptions;
 use Mattmy\FileMagic\Enums\CollisionPolicy;
+use Mattmy\FileMagic\Exceptions\InvalidFileTarget;
 use Mattmy\FileMagic\Exceptions\InvalidStoragePath;
 use Mattmy\FileMagic\Facades\FileMagic;
 use Mattmy\FileMagic\Models\StoredFile;
@@ -32,6 +33,15 @@ it('stores and reads an uploaded file', function (): void {
         ->and($file->location_hash)->toBe(\hash('sha256', "testing\0files/manual.txt"));
 
     Storage::disk('testing')->assertExists($file->path);
+});
+
+it('sanitizes the original filename of an existing record for a download', function (): void {
+    $file = FileMagic::text('contents')->store();
+    $file->forceFill(['original_filename' => "archive\\report\x7F.txt"])->saveOrFail();
+
+    $response = FileMagic::find($file)->download();
+
+    expect($response->headers->get('Content-Disposition'))->toBe('attachment; filename=report.txt');
 });
 
 it('delegates generated content without a trusted MIME type to ordinary inspection', function (
@@ -225,6 +235,41 @@ it('updates the record when overwriting a path', function (): void {
         ->and(StoredFile::query()->count())->toBe(1);
 });
 
+it('preserves or replaces optional record attributes when overwriting', /**
+ * @param  array<string, mixed>  $expectedMetadata
+ */ function (?string $source, bool $replaceOwner, array $expectedMetadata): void {
+    $owner = FileMagic::text('original owner')->store();
+    $otherOwner = FileMagic::text('replacement owner')->store();
+    $original = FileMagic::text('old contents')
+        ->named('same')
+        ->ownedBy($owner)
+        ->withMetadata(['source' => 'import', 'version' => 1])
+        ->store();
+    $pending = FileMagic::text('new contents')->named('same')->onCollision(CollisionPolicy::Overwrite);
+
+    if ($source !== null) {
+        $pending->withMetadata($source === '' ? [] : ['source' => $source]);
+    }
+
+    if ($replaceOwner) {
+        $pending->ownedBy($otherOwner);
+    }
+
+    $updated = $pending->store();
+    $file = StoredFile::query()->findOrFail($updated->id);
+
+    expect($file->id)->toBe($original->id)
+        ->and($file->uuid)->toBe($original->uuid)
+        ->and($file->contents())->toBe('new contents')
+        ->and($file->metadata)->toBe($expectedMetadata)
+        ->and($file->owner?->is($replaceOwner ? $otherOwner : $owner))->toBeTrue()
+        ->and($owner->metadata)->toBe([]);
+})->with([
+    'omitted options preserve both values' => [null, false, ['source' => 'import', 'version' => 1]],
+    'explicit options replace both values' => ['manual', true, ['source' => 'manual']],
+    'empty metadata clears the value' => ['', false, []],
+]);
+
 it('accepts variadic array collection and model targets in order', function (): void {
     $first = FileMagic::fromContent('first')->store();
     $second = FileMagic::fromContent('second')->store();
@@ -238,6 +283,38 @@ it('accepts variadic array collection and model targets in order', function (): 
         ->and($ids)->toBe([$second->id, $first->id])
         ->and(FileMagic::find($first)->one()?->getKey())->toBe($first->getKey())
         ->and(FileMagic::find([])->get()->isEmpty())->toBeTrue();
+});
+
+it('resolves decimal ID strings and skips invalid scalars in target order', function (): void {
+    $first = FileMagic::text('first')->store();
+    $second = FileMagic::text('second')->store();
+
+    $files = FileMagic::find(
+        '0' . $second->id,
+        [true, false, null, 0, -1, '', ' ', '1.0', '1e0', 'report.pdf', ' ' . $first->uuid],
+        collect([(string) $first->id, $second->id, $first->uuid]),
+    )->get();
+
+    expect($files->pluck('id')->all())->toBe([$second->id, $first->id]);
+});
+
+it('does not query or delete when all targets are invalid scalar values', function (): void {
+    $file = FileMagic::text('contents')->store();
+    $queries = 0;
+    DB::listen(static function () use (&$queries): void {
+        $queries++;
+    });
+
+    $query = FileMagic::find((float) $file->id, [1.5, \INF, \NAN], collect([\PHP_INT_MAX . '0']));
+
+    expect($query->one())->toBeNull()
+        ->and($query->delete())->toBe(0)
+        ->and($queries)->toBe(0);
+    Storage::disk('testing')->assertExists($file->path);
+});
+
+it('rejects nested target containers', function (): void {
+    expect(static fn () => FileMagic::find([[1]])->get())->toThrow(InvalidFileTarget::class);
 });
 
 it('resolves uppercase UUID targets once and deduplicates mixed identities', function (): void {

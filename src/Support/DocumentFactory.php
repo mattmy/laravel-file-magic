@@ -69,7 +69,11 @@ final class DocumentFactory
 
         try {
             $this->writeCsv($stream, $rows);
-            \rewind($stream);
+
+            if (\fflush($stream) === false || \rewind($stream) === false) {
+                throw new InvalidDocumentData('The CSV document could not be prepared for reading.');
+            }
+
             $contents = \stream_get_contents($stream);
 
             if ($contents === false) {
@@ -93,9 +97,12 @@ final class DocumentFactory
         $expectedKeys = null;
 
         foreach ($rows as $row) {
-            $row = $this->normalizeCsvRow($row);
+            $row = $this->validateCsvRow($row);
             $keys = \array_keys($row);
-            $this->ensureCsvShape($expectedKeys, $keys);
+
+            if ($expectedKeys !== null && $keys !== $expectedKeys) {
+                throw new InvalidDocumentData('Every CSV row must use the same keys in the same order.');
+            }
 
             if ($expectedKeys === null) {
                 $expectedKeys = $keys;
@@ -105,29 +112,16 @@ final class DocumentFactory
                 }
             }
 
-            $this->writeCsvRow($stream, \array_values($row));
+            $this->writeCsvRow($stream, $row);
         }
     }
 
     /**
-     * Ensure every CSV row uses the same keys and key order.
-     *
-     * @param  list<int|string>|null  $expectedKeys
-     * @param  list<int|string>  $keys
-     */
-    private function ensureCsvShape(?array $expectedKeys, array $keys): void
-    {
-        if ($expectedKeys !== null && $keys !== $expectedKeys) {
-            throw new InvalidDocumentData('Every CSV row must use the same keys in the same order.');
-        }
-    }
-
-    /**
-     * Validate and normalize one CSV row at the public input boundary.
+     * Validate one CSV row at the public input boundary.
      *
      * @return array<array-key, scalar|null>
      */
-    private function normalizeCsvRow(mixed $row): array
+    private function validateCsvRow(mixed $row): array
     {
         if (\is_array($row) === false) {
             throw new InvalidDocumentData('Every CSV row must be an array.');
@@ -166,7 +160,7 @@ final class DocumentFactory
      * Write one row using RFC 4180-compatible defaults.
      *
      * @param  resource  $stream
-     * @param  list<scalar|null>  $row
+     * @param  array<array-key, scalar|null>  $row
      */
     private function writeCsvRow($stream, array $row): void
     {

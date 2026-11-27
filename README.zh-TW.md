@@ -2,28 +2,25 @@
 
 [English](README.md)
 
-FileMagic 將檔案存到 Laravel Filesystem 磁碟，並回傳一筆 Eloquent `StoredFile` 紀錄。
-要讀取、下載或刪除檔案時，可用 `FileMagic::find()` 查詢。
+FileMagic 將檔案存到 Laravel Filesystem 磁碟，並為每個檔案保留一筆 Eloquent `StoredFile` 紀錄。
 
 ## 可以做什麼
 
-- 儲存上傳檔案、本機檔案、字串內容、Base64 與遠端 HTTP(S) 檔案。
+- 儲存上傳檔案、本機檔案、文字或二進位內容、Base64 與遠端 HTTP(S) 檔案。
 - 產生 TXT、JSON 或 CSV，也能用可信任的 MIME 類型儲存應用程式自行產生的內容。
 - 限制檔案大小與 MIME 類型、設定檔名衝突的處理方式，以及縮小支援的圖片。
 - 附加中繼資料，並將檔案關聯至 Eloquent Model。
-- 用 ID、UUID 或 Model 查詢。批次查詢可傳入陣列或 Laravel Collection。
-- 產生檔案網址、將多個檔案打包成 ZIP 下載，或批次刪除檔案。
+- 用 ID、UUID 或 Model 查出檔案，再讀取內容、產生網址、下載單檔或 ZIP，也能批次刪除。
 - 稽核哪些資料庫紀錄對應的檔案已遺失。
 
 ## 系統需求
 
-- PHP 8.3–8.x
+- PHP 8（最低版本為 8.3）
 - Laravel 12 或 13
 - PHP `ext-fileinfo`
 - 至少一個已設定的 Laravel Filesystem 磁碟及資料庫連線
 
-遠端檔案需要 PHP `ext-curl`；圖片縮放功能另外需要 `intervention/image` 4.x 與 PHP GD 或 Imagick；
-ZIP 下載需要 PHP `ext-zip`。
+匯入遠端檔案需要 `ext-curl`，下載 ZIP 需要 `ext-zip`。
 
 ## 安裝
 
@@ -81,7 +78,7 @@ FileMagic::csv($rows)->named('report')->store();
 若省略 MIME 類型或找不到對應的副檔名，FileMagic 會改用 `fromContent()` 偵測內容。
 
 ```php
-// 不安全：bytes 與 MIME type 都不是由應用程式控制。
+// 請求內容和 MIME 類型都由呼叫端提供，這種用法不安全。
 FileMagic::fromGeneratedContent($request->getContent(), null, $request->header('Content-Type'));
 ```
 
@@ -110,6 +107,8 @@ $file = FileMagic::fromUpload($uploadedFile)
 `named()` 會保留檔名主體中的點號，再依 MIME 類型附加副檔名。例如純文字檔指定 `report.txt` 時，
 在檔名未被占用的情況下會儲存為 `report.txt.txt`。
 
+覆寫時，省略 `ownedBy()` 或 `withMetadata()` 會保留對應的原值。傳入 `withMetadata([])` 可清空中繼資料。
+
 要在儲存前縮小支援的圖片，可使用 `resizeImage()`。
 
 ```php
@@ -118,28 +117,33 @@ $image = FileMagic::fromUpload($uploadedImage)
     ->store();
 ```
 
+FileMagic 會在縮放前檢查大小與 MIME 類型，輸出有變更時會再檢查一次。
+
 ## 尋找與使用檔案
 
 ```php
-$file = FileMagic::find($uuid)->one();
+$query = FileMagic::find($uuid);
+$file = $query->one();
 $files = FileMagic::find([$firstId, $secondUuid])->get();
-$exists = FileMagic::find($uuid)->exists();
-$url = FileMagic::find($uuid)->url();
-$temporaryUrl = FileMagic::find($uuid)->temporaryUrl();
-$customTemporaryUrl = FileMagic::find($uuid)->temporaryUrl(now()->addMinutes(15));
-$contents = FileMagic::find($uuid)->contents();
-$stream = FileMagic::find($uuid)->readStream();
+$exists = $query->exists();
+$url = $query->url();
+$temporaryUrl = $query->temporaryUrl();
+$customTemporaryUrl = $query->temporaryUrl(now()->addMinutes(15));
+$contents = $query->contents();
 
-return FileMagic::find($uuid)->download();
+return $query->download();
 ```
 
-對同一批目標執行多個操作時，可沿用同一個 `FileQuery`。大型檔案請用 `readStream()`，用完後要關閉串流。
-`contents()` 會把整個檔案讀進記憶體。
+`find()` 接受 `'123'` 這類十進位 ID 字串，並略過 `1.0` 這類無效純量。
+沿用同一個 `FileQuery` 可避免重複查詢。`contents()` 會把整個檔案讀進記憶體。大型檔案請用 `readStream()`，
+用完後關閉串流。
 
 ## 安全性與資源限制
 
-FileMagic 會在解碼前檢查 Base64 解碼後的大小。編碼字串留在記憶體，解碼結果則分段寫入暫存檔。
-儲存路徑須為以 `/` 分隔的相對路徑。圖片處理前會檢查大小和 MIME 類型，輸出有變更時會再檢查一次。
+- 應用程式須檢查每次操作的權限。下載 ZIP 時，要確認使用者可存取其中每個檔案。
+- 儲存路徑須為以 `/` 分隔的相對路徑。
+- `store()` 會把來源複製到本機暫存檔。請另為 Base64 解碼檔、遠端下載、ZIP 內容與壓縮檔，以及覆寫備份預留空間。
+- FileMagic 會在解碼前檢查 Base64 解碼後的大小。Base64 編碼字串和 `csv()` 產生的完整內容都會占用 PHP 記憶體。
 
 ## ZIP 下載與刪除
 
@@ -151,8 +155,8 @@ return FileMagic::find($targets)->downloadZip('documents');
 $deleted = FileMagic::find($targets)->delete();
 ```
 
-應用程式須檢查每次操作的權限，包括 ZIP 內的每個檔案。啟用路徑鎖定後，儲存、批次刪除與稽核清理
-會透過同一個快取後端，在鎖的有效期限內協調。直接呼叫 `StoredFile::delete()` 或從外部寫入時不會使用這些鎖。
+啟用路徑鎖定後，儲存、批次刪除與稽核清理會共用同一個快取後端，並在鎖的有效期限內協調。
+直接呼叫 `StoredFile::delete()` 或從外部寫入時不會使用這些鎖。
 
 ## 一致性稽核
 
@@ -162,8 +166,8 @@ $deleted = FileMagic::find($targets)->delete();
 php artisan file-magic:audit
 ```
 
-稽核預設為唯讀。加上 `--delete-missing-records` 後，會重新核對紀錄與檔案，確認檔案仍遺失才刪除紀錄。
-啟用路徑鎖定時，這些檢查會在鎖內進行。使用遠端磁碟時，每次確認檔案是否存在都可能增加等待時間與請求費用。
+稽核預設為唯讀。`--delete-missing-records` 會重新核對紀錄與檔案，確認檔案仍遺失才刪除紀錄。
+非互動清理需要 `--force`。使用遠端磁碟時，每次檢查檔案是否存在都可能增加等待時間與請求費用。
 
 ## 處理錯誤
 
@@ -187,4 +191,4 @@ try {
 
 ## 授權
 
-FileMagic 是使用 [MIT License](LICENSE) 發佈的開源軟體。
+FileMagic 採用 [MIT 授權條款](LICENSE)。

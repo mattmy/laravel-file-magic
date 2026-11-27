@@ -20,6 +20,7 @@ use Mattmy\FileMagic\Exceptions\FileRecoveryFailed;
 use Mattmy\FileMagic\Exceptions\FileTooLarge;
 use Mattmy\FileMagic\Exceptions\FileWriteFailed;
 use Mattmy\FileMagic\Exceptions\InvalidConfiguration;
+use Mattmy\FileMagic\Exceptions\InvalidStoragePath;
 use Mattmy\FileMagic\Models\StoredFile;
 use Mattmy\FileMagic\PendingFile;
 use Mattmy\FileMagic\Sources\RemoteFileSource;
@@ -67,9 +68,7 @@ final readonly class StoreFile
     {
         $configuredDisk = $pending->disk() === null;
         $diskName = $pending->disk() ?? $this->fileMagicConfig->disk();
-        $directory = $this->paths->directory(
-            $pending->directory() ?? $this->fileMagicConfig->directory(),
-        );
+        $directory = $this->resolveDirectory($pending->directory());
         $filename = $this->paths->filename($pending->filename() ?? Str::ulid()->toString());
         $visibility = $pending->fileVisibility() ?? $this->fileMagicConfig->visibility();
         $policy = $pending->collisionPolicy() ?? $this->fileMagicConfig->collisionPolicy();
@@ -375,6 +374,28 @@ final readonly class StoreFile
     }
 
     /**
+     * Validate the directory and distinguish a bad default from an invalid override.
+     *
+     * @throws InvalidConfiguration
+     * @throws InvalidStoragePath
+     */
+    private function resolveDirectory(?string $directory): string
+    {
+        if ($directory !== null) {
+            return $this->paths->directory($directory);
+        }
+
+        try {
+            return $this->paths->directory($this->fileMagicConfig->directory());
+        } catch (InvalidStoragePath $exception) {
+            throw new InvalidConfiguration(
+                'The [file-magic.directory] configuration must be a safe relative path.',
+                previous: $exception,
+            );
+        }
+    }
+
+    /**
      * Create the configured Eloquent file record.
      *
      * @throws FileRecordFailed
@@ -398,19 +419,24 @@ final readonly class StoreFile
             ? $model->newQueryWithoutScopes()->where('location_hash', $locationHash)->first()
             : null;
         $file ??= $model;
-        $file->fill([
+        $attributes = [
             'disk' => $disk,
             'path' => $path,
             'location_hash' => $locationHash,
             'filename' => $filename,
-            'original_filename' => $this->originalFilename($source),
+            'original_filename' => PathNormalizer::originalFilename($source->originalFilename()),
             'extension' => $extension,
             'mime_type' => $metadata->mimeType,
             'size' => $metadata->size,
             'checksum' => $metadata->checksum,
             'visibility' => $visibility,
-            'metadata' => $pending->metadata(),
-        ]);
+        ];
+
+        if ($file->exists === false || $pending->hasMetadata()) {
+            $attributes['metadata'] = $pending->metadata();
+        }
+
+        $file->fill($attributes);
 
         if ($file->exists === false) {
             $file->uuid = (string) Str::uuid();
@@ -433,22 +459,5 @@ final readonly class StoreFile
     private function locationHash(string $disk, string $path): string
     {
         return \hash(self::LOCATION_HASH_ALGORITHM, $disk . "\0" . $path);
-    }
-
-    /**
-     * Return a safe display-only original filename.
-     */
-    private function originalFilename(FileSource $source): ?string
-    {
-        $originalFilename = $source->originalFilename();
-
-        if ($originalFilename === null) {
-            return null;
-        }
-
-        $basename = \basename(\str_replace('\\', '/', $originalFilename));
-        $basename = \preg_replace('/\p{Cc}/u', '', $basename);
-
-        return $basename === null || $basename === '' ? null : \mb_substr($basename, 0, 255);
     }
 }

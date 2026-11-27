@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -172,6 +173,27 @@ it('uses the configured custom model for store find and batch delete', function 
         ->and($deleted)->toBe(1)
         ->and(TrackingStoredFile::$queriesWithoutScopes - $queriesBeforeDeletion)->toBe(5)
         ->and(TrackingStoredFile::query()->count())->toBe(0);
+});
+
+it('deletes files with default owner eager loading and strict attribute checks', function (): void {
+    $model = new class() extends StoredFile
+    {
+        /** @var list<string> */
+        protected $with = ['owner'];
+    };
+    config()->set('file-magic.model', $model::class);
+    $file = FileMagic::text('contents')->store();
+    $previous = Model::preventsAccessingMissingAttributes();
+    Model::preventAccessingMissingAttributes();
+
+    try {
+        expect(FileMagic::find($file)->delete())->toBe(1);
+    } finally {
+        Model::preventAccessingMissingAttributes($previous);
+    }
+
+    $this->assertModelMissing($file);
+    Storage::disk('testing')->assertMissing($file->path);
 });
 
 /**

@@ -22,7 +22,7 @@ final readonly class FileFinder
     /**
      * Resolve file targets while preserving input order and removing duplicates.
      *
-     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, covariant int|string|StoredFile>>  $targets
+     * @param  list<mixed>  $targets
      * @return EloquentCollection<int, StoredFile>
      *
      * @throws InvalidFileTarget
@@ -63,9 +63,9 @@ final readonly class FileFinder
     }
 
     /**
-     * Normalize variadic, array and Collection targets into one strict list.
+     * Normalize variadic, array and Collection targets into one list of valid targets.
      *
-     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, covariant int|string|StoredFile>>  $targets
+     * @param  list<mixed>  $targets
      * @return list<int|string|StoredFile>
      */
     private function normalize(array $targets): array
@@ -80,7 +80,11 @@ final readonly class FileFinder
             };
 
             foreach ($values as $value) {
-                $normalizedTargets[] = $this->normalizeTarget($value);
+                $normalized = $this->normalizeTarget($value);
+
+                if ($normalized !== null) {
+                    $normalizedTargets[] = $normalized;
+                }
             }
         }
 
@@ -88,20 +92,33 @@ final readonly class FileFinder
     }
 
     /**
-     * Validate and normalize one file target.
+     * Normalize one file target or omit an invalid scalar value.
+     *
+     * @throws InvalidFileTarget
      */
-    private function normalizeTarget(mixed $target): int|string|StoredFile
+    private function normalizeTarget(mixed $target): int|string|StoredFile|null
     {
         if ($target instanceof StoredFile) {
             return $this->models->validateTarget($target);
         }
 
-        if (\is_int($target) && $target > 0) {
-            return $target;
+        if (\is_int($target)) {
+            return $target > 0 ? $target : null;
         }
 
-        if (\is_string($target) && Str::isUuid($target)) {
-            return \strtolower($target);
+        if (\is_string($target)) {
+            if (\preg_match('/\A[0-9]+\z/', $target) === 1) {
+                $digits = \ltrim($target, '0');
+                $id = (int) $digits;
+
+                return $id > 0 && (string) $id === $digits ? $id : null;
+            }
+
+            return Str::isUuid($target) ? \strtolower($target) : null;
+        }
+
+        if ($target === null || \is_float($target) || \is_bool($target)) {
+            return null;
         }
 
         throw new InvalidFileTarget('A file target must be a positive integer ID, UUID, or stored file model.');

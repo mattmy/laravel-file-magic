@@ -32,9 +32,9 @@ final class FileQuery
     private ?EloquentCollection $resolvedFiles = null;
 
     /**
-     * Create a file query from normalized public targets.
+     * Create a file query from the original public targets.
      *
-     * @param  list<int|string|StoredFile|array<array-key, int|string|StoredFile>|Collection<array-key, covariant int|string|StoredFile>>  $targets
+     * @param  list<mixed>  $targets
      */
     public function __construct(
         private readonly FileFinder $finder,
